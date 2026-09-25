@@ -1,0 +1,36 @@
+import type { GraphicsConfig } from './types';
+
+export const graphicsConfig: GraphicsConfig = {
+  desktop: {
+    id: 'desktop',
+    pixelRatioCap: 2,
+    antialias: true,
+    shadows: true,
+    shadowMapSize: 1024,
+    robotLights: true,
+    maxParticles: 600,
+    anisotropy: 8,
+    hrtfAudio: true,
+  },
+  mobile: {
+    id: 'mobile',
+    pixelRatioCap: 1.5,
+    antialias: false,
+    shadows: false,
+    shadowMapSize: 512,
+    robotLights: false,
+    maxParticles: 200,
+    anisotropy: 2,
+    hrtfAudio: false,
+  },
+  fovDeg: 72,
+  fogColor: 0x0a1210,
+  ambientColor: 0xa9d6c8,
+  fogDensity: [0.018, 0.06],
+  ambientIntensity: [0.9, 0.15],
+  hemiSkyColor: 0xdff5ee,
+  hemiGroundColor: 0x1a2622,
+  hemiIntensity: [1.6, 0.3],
+  wallEmissive: [1.4, 0.45],
+  flashLights: 2,
+};

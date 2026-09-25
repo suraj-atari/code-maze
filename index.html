@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#020306" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Escape a dark futuristic maze without being caught by autonomous robots." />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23020306'/%3E%3Cpath d='M2 2h12v3H5v6h4V8h5v6H2z' fill='%232fd8ff'/%3E%3C/svg%3E"
+    />
+    <title>Code Maze</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="game-root"></div>
+
+      <!-- Mobile controls (wired by input/TouchInput) -->
+      <div id="touch-controls" aria-hidden="true">
+        <div class="look-zone"></div>
+        <div class="joystick-zone">
+          <div class="joystick-base"><div class="joystick-knob"></div></div>
+          <span class="joystick-hint">MOVE</span>
+        </div>
+        <div class="touch-buttons">
+          <button class="touch-btn" data-action="crouch">SNEAK</button>
+          <button class="touch-btn" data-action="sprint">RUN</button>
+          <button class="touch-btn touch-btn-lamp" data-action="lamp">LAMP</button>
+          <button class="touch-btn touch-btn-use" data-action="interact">USE</button>
+          <button class="touch-btn touch-btn-attack" data-action="attack">SMASH</button>
+          <button class="touch-btn touch-btn-attack" data-action="throw">THROW</button>
+          <button class="touch-btn touch-btn-emp" data-action="nullify">EMP</button>
+        </div>
+        <button class="touch-view" data-action="view" aria-label="Switch first/third-person view">VIEW</button>
+        <button class="touch-pause" data-action="pause" aria-label="Pause">❚❚</button>
+      </div>
+
+      <!-- HUD (driven by ui/Hud) -->
+      <div id="hud" class="hidden">
+        <div class="hud-info">
+          <div id="hud-level">RESEARCH FACILITY</div>
+          <div id="hud-time">00:00</div>
+        </div>
+        <div class="hud-detect">
+          <div class="detect-meter"><div id="hud-detect-fill"></div></div>
+          <div id="hud-detect-label">UNDETECTED</div>
+        </div>
+        <div class="hud-bars">
+          <div class="hud-bar-row">
+            <span class="hud-bar-label" id="hud-lamp-label">LAMP</span>
+            <div class="hud-bar"><div id="hud-battery" class="hud-bar-fill battery"></div></div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-label">STAMINA</span>
+            <div class="hud-bar"><div id="hud-stamina" class="hud-bar-fill stamina"></div></div>
+          </div>
+          <div class="hud-weapons">
+            <span id="hud-hammer" class="hud-weapon empty">HAMMER —</span>
+            <span id="hud-grenades" class="hud-weapon empty">GRENADES ×0</span>
+            <span id="hud-nullifiers" class="hud-weapon nullifier empty">NULLIFIER ×0</span>
+            <span id="hud-keycard" class="hud-weapon keycard empty hidden">KEYCARD —</span>
+          </div>
+        </div>
+        <div id="tutorial-objective" class="hidden">
+          <span id="tutorial-objective-step"></span>
+          <span id="tutorial-objective-text"></span>
+        </div>
+        <div id="hud-crosshair"></div>
+        <div id="hud-prompt" class="hidden"></div>
+        <div id="hud-toast"></div>
+        <div id="hud-vignette"></div>
+        <div id="hud-darkness"></div>
+        <div id="tutorial-card" class="hidden" role="dialog" aria-live="polite">
+          <div id="tutorial-step"></div>
+          <h3 id="tutorial-title"></h3>
+          <div id="tutorial-body"></div>
+          <button id="tutorial-continue" class="btn primary" type="button">CONTINUE</button>
+          <div id="tutorial-hint"></div>
+        </div>
+      </div>
+
+      <section id="screen-loading" class="screen">
+        <div class="panel">
+          <h1 class="title">CODE<span>MAZE</span></h1>
+          <div class="progress"><div id="loading-bar"></div></div>
+          <p id="loading-label" class="muted">Initialising…</p>
+        </div>
+      </section>
+
+      <section id="screen-menu" class="screen hidden">
+        <div class="panel wide">
+          <h1 class="title">CODE<span>MAZE</span></h1>
+          <p class="tagline">
+            You wake up inside a sealed research labyrinth. The sentinels are still running.
+            Find the exit. Stay out of their light.
+          </p>
+          <div id="difficulty-list" class="difficulty-list" role="radiogroup" aria-label="Difficulty"></div>
+          <button id="btn-start" class="btn primary">ENTER THE MAZE</button>
+          <button id="btn-tutorial" class="btn">GAME PLAY TUTORIAL</button>
+          <div class="controls-help desktop-only">
+            <span><b>WASD</b> move</span><span><b>Mouse</b> look</span><span><b>Shift</b> run</span>
+            <span><b>C</b> sneak</span><span><b>F / RMB</b> lamp</span><span><b>E</b> use</span><span><b>LMB / Q</b> hammer</span><span><b>G</b> grenade</span><span><b>R</b> nullifier</span><span><b>V</b> 1st/3rd person</span><span><b>Esc</b> pause</span>
+          </div>
+          <div class="controls-help touch-only">
+            <span><b>Left thumb</b> move (push lightly to sneak)</span><span><b>Right thumb</b> look</span>
+            <span><b>LAMP · RUN · SNEAK · USE · SMASH · THROW · EMP</b> buttons</span><span><b>VIEW</b> 1st/3rd person</span>
+          </div>
+          <p class="hint muted">Lamp on: you see further — so do they. Running is loud.</p>
+          <p class="hint muted">Sealed rooms line every corridor: ARMORY doors hide hammers and grenades, EMP LAB doors a robot nullifier that paralyses sentinels for a few seconds.</p>
+          <p class="hint muted">Each wing's exit is locked. Find the keycard in its SECURITY room, then push on into the next wing.</p>
+        </div>
+      </section>
+
+      <section id="screen-pause" class="screen hidden">
+        <div class="panel">
+          <h2>PAUSED</h2>
+          <button id="btn-resume" class="btn primary">RESUME</button>
+          <button id="btn-restart" class="btn">RESTART RUN</button>
+          <button id="btn-pause-menu" class="btn">MAIN MENU</button>
+        </div>
+      </section>
+
+      <section id="screen-gameover" class="screen danger hidden">
+        <div class="panel">
+          <h2>TERMINATED</h2>
+          <p id="gameover-stats" class="muted"></p>
+          <button id="btn-retry" class="btn primary">TRY AGAIN</button>
+          <button id="btn-gameover-menu" class="btn">MAIN MENU</button>
+        </div>
+      </section>
+
+      <section id="screen-complete" class="screen success hidden">
+        <div class="panel">
+          <h2 id="complete-title">SECTOR CLEARED</h2>
+          <p id="complete-stats" class="muted"></p>
+          <button id="btn-next" class="btn primary">NEXT LEVEL</button>
+          <button id="btn-complete-menu" class="btn">MAIN MENU</button>
+        </div>
+      </section>
+
+      <div id="rotate-overlay">
+        <div class="rotate-icon">⟳</div>
+        <p>Rotate your device to landscape</p>
+      </div>
+
+      <div id="fatal-error" class="screen hidden"><div class="panel"><h2>ERROR</h2><p id="fatal-message"></p></div></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

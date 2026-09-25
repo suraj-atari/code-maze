@@ -1,0 +1,815 @@
+:root {
+  --bg: #020306;
+  --panel: rgba(6, 12, 18, 0.86);
+  --line: rgba(80, 210, 255, 0.35);
+  --accent: #2fd8ff;
+  --accent-dim: rgba(47, 216, 255, 0.18);
+  --danger: #ff2f45;
+  --warn: #ffd23a;
+  --ok: #35ff9a;
+  --text: #d9f4ff;
+  --muted: #7d99a8;
+  --font: 'Share Tech Mono', 'Consolas', 'SFMono-Regular', 'Menlo', monospace;
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+#app,
+#game-root {
+  position: fixed;
+  inset: 0;
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- Screens ---------- */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, var(--safe-t)) max(16px, var(--safe-r)) max(16px, var(--safe-b)) max(16px, var(--safe-l));
+  background: radial-gradient(ellipse at center, rgba(4, 16, 24, 0.75), rgba(0, 0, 0, 0.95));
+  z-index: 20;
+  overflow-y: auto;
+}
+
+.screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
+}
+
+.screen.danger {
+  background: radial-gradient(ellipse at center, rgba(60, 0, 6, 0.8), rgba(0, 0, 0, 0.95));
+}
+
+.screen.success {
+  background: radial-gradient(ellipse at center, rgba(0, 40, 24, 0.8), rgba(0, 0, 0, 0.95));
+}
+
+.panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 28px 24px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 0 40px rgba(47, 216, 255, 0.08), inset 0 0 30px rgba(47, 216, 255, 0.05);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel.wide {
+  width: min(720px, 100%);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(34px, 7vw, 64px);
+  letter-spacing: 0.18em;
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(47, 216, 255, 0.55);
+}
+
+.title span {
+  color: var(--accent);
+}
+
+h2 {
+  margin: 0 0 6px;
+  letter-spacing: 0.25em;
+  font-size: clamp(24px, 5vw, 36px);
+}
+
+.danger h2 {
+  color: var(--danger);
+  text-shadow: 0 0 20px rgba(255, 47, 69, 0.6);
+}
+
+.success h2 {
+  color: var(--ok);
+  text-shadow: 0 0 20px rgba(53, 255, 154, 0.6);
+}
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 16px;
+  letter-spacing: 0.15em;
+  padding: 14px 18px;
+  min-height: 48px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.btn:hover,
+.btn:focus-visible {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.btn.primary {
+  border-color: var(--accent);
+  color: var(--bg);
+  background: var(--accent);
+  font-weight: bold;
+  box-shadow: 0 0 20px rgba(47, 216, 255, 0.35);
+}
+
+.btn.primary:hover {
+  background: #7ae8ff;
+}
+
+.difficulty-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.difficulty {
+  font-family: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.difficulty b {
+  display: block;
+  letter-spacing: 0.12em;
+  margin-bottom: 4px;
+}
+
+.difficulty small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.difficulty[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.controls-help {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.controls-help b {
+  color: var(--text);
+}
+
+body.touch .desktop-only,
+body:not(.touch) .touch-only {
+  display: none;
+}
+
+.progress {
+  height: 6px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+#loading-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  transition: width 0.2s;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-info {
+  position: absolute;
+  top: max(14px, var(--safe-t));
+  left: max(16px, var(--safe-l));
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-shadow: 0 0 6px #000;
+}
+
+#hud-level {
+  color: var(--text);
+}
+
+.hud-detect {
+  position: absolute;
+  top: max(14px, var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  width: min(260px, 40vw);
+}
+
+.detect-meter {
+  height: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#hud-detect-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--warn);
+  transition: background 0.2s;
+}
+
+#hud-detect-label {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+.hud-detect.chased #hud-detect-fill {
+  background: var(--danger);
+  box-shadow: 0 0 12px var(--danger);
+}
+
+.hud-detect.chased #hud-detect-label {
+  color: var(--danger);
+  animation: blink 0.5s steps(2) infinite;
+}
+
+.hud-bars {
+  position: absolute;
+  left: max(16px, var(--safe-l));
+  bottom: max(16px, var(--safe-b));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(260px, 38vw);
+}
+
+.hud-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+
+.hud-bar-label {
+  width: 64px;
+  color: var(--muted);
+}
+
+.hud-bar-label.on {
+  color: var(--warn);
+}
+
+.hud-bar {
+  flex: 1;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.hud-bar-fill {
+  height: 100%;
+  width: 100%;
+}
+
+.hud-bar-fill.battery {
+  background: var(--warn);
+}
+
+.hud-bar-fill.battery.low {
+  background: var(--danger);
+  animation: blink 0.6s steps(2) infinite;
+}
+
+.hud-bar-fill.stamina {
+  background: var(--accent);
+}
+
+.hud-weapons {
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+
+.hud-weapon {
+  color: #ffb030;
+  text-shadow: 0 0 6px rgba(255, 176, 48, 0.5);
+}
+
+.hud-weapon.nullifier {
+  color: #c07bff;
+  text-shadow: 0 0 6px rgba(192, 123, 255, 0.5);
+}
+
+.hud-weapon.keycard {
+  color: #4dff88;
+  text-shadow: 0 0 6px rgba(77, 255, 136, 0.5);
+}
+
+.hud-weapon.empty {
+  color: var(--muted);
+  text-shadow: none;
+  opacity: 0.6;
+}
+
+/* ---------- Tutorial ---------- */
+#tutorial-objective {
+  position: absolute;
+  top: calc(max(14px, var(--safe-t)) + 42px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(560px, 70vw);
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  background: rgba(2, 10, 16, 0.72);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  line-height: 1.4;
+}
+
+#tutorial-objective-step {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+#tutorial-objective.fresh {
+  animation: objective-in 1.2s ease-out;
+}
+
+@keyframes objective-in {
+  0% {
+    border-color: var(--accent);
+    box-shadow: 0 0 24px rgba(47, 216, 255, 0.6);
+  }
+  100% {
+    border-color: var(--line);
+    box-shadow: none;
+  }
+}
+
+#tutorial-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  padding: 20px 22px 16px;
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  background: rgba(3, 10, 16, 0.93);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(47, 216, 255, 0.15);
+  pointer-events: auto;
+  z-index: 2;
+}
+
+#tutorial-card[data-tone='danger'] {
+  border-color: var(--danger);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 47, 69, 0.2);
+}
+
+#tutorial-card[data-tone='success'] {
+  border-color: var(--ok);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(53, 255, 154, 0.18);
+}
+
+#tutorial-step {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+#tutorial-title {
+  margin: 4px 0 10px;
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+}
+
+#tutorial-card[data-tone='danger'] #tutorial-title {
+  color: var(--danger);
+}
+
+#tutorial-card[data-tone='success'] #tutorial-title {
+  color: var(--ok);
+}
+
+#tutorial-body p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#tutorial-body strong {
+  color: #fff;
+}
+
+#tutorial-body kbd,
+#tutorial-objective kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 6px;
+  margin: 0 1px;
+  border: 1px solid var(--accent);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: rgba(47, 216, 255, 0.12);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9em;
+  text-align: center;
+}
+
+.tut-chip-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tut-chip {
+  flex: 0 0 64px;
+  padding: 1px 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  font-weight: bold;
+  color: var(--chip);
+  border: 1px solid var(--chip);
+  box-shadow: 0 0 10px var(--chip);
+}
+
+#tutorial-continue {
+  width: 100%;
+  margin-top: 6px;
+}
+
+#tutorial-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-align: center;
+  color: var(--muted);
+}
+
+body:not(.touch) #tutorial-continue {
+  display: none;
+}
+
+/* Touch buttons would cover the card; it has its own CONTINUE button. */
+body.tutorial-card-open #touch-controls,
+body.tutorial-card-open #tutorial-objective {
+  visibility: hidden;
+}
+
+#hud-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+#hud-prompt {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  background: rgba(0, 20, 12, 0.7);
+  letter-spacing: 0.15em;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#hud-toast {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--text);
+  text-shadow: 0 0 10px #000;
+  opacity: 0;
+  transition: opacity 0.4s;
+  text-align: center;
+}
+
+#hud-toast.show {
+  opacity: 1;
+}
+
+#hud-vignette,
+#hud-darkness {
+  position: absolute;
+  inset: 0;
+}
+
+#hud-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 0, 20, 0.55) 100%);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+#hud-darkness {
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Touch controls ---------- */
+#touch-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: none;
+  touch-action: none;
+}
+
+#touch-controls.visible {
+  display: block;
+}
+
+.look-zone {
+  position: absolute;
+  inset: 0 0 0 40%;
+  touch-action: none;
+}
+
+.joystick-zone {
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 0;
+  width: 40%;
+  touch-action: none;
+}
+
+.joystick-hint {
+  position: absolute;
+  left: max(28px, var(--safe-l));
+  bottom: max(28px, var(--safe-b));
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.joystick-base {
+  position: absolute;
+  left: 110px;
+  top: 65%;
+  width: 130px;
+  height: 130px;
+  margin: -65px 0 0 -65px;
+  border-radius: 50%;
+  border: 2px solid rgba(47, 216, 255, 0.35);
+  background: rgba(47, 216, 255, 0.06);
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+.joystick-base.active {
+  opacity: 1;
+}
+
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(47, 216, 255, 0.45);
+  box-shadow: 0 0 16px rgba(47, 216, 255, 0.4);
+}
+
+.touch-buttons {
+  position: absolute;
+  right: max(18px, var(--safe-r));
+  bottom: max(18px, var(--safe-b));
+  display: grid;
+  grid-template-columns: repeat(2, 76px);
+  gap: 12px;
+}
+
+.touch-btn,
+.touch-pause,
+.touch-view {
+  font-family: var(--font);
+  color: var(--text);
+  border: 2px solid rgba(47, 216, 255, 0.45);
+  background: rgba(4, 16, 24, 0.55);
+  touch-action: none;
+}
+
+.touch-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.touch-btn:active,
+.touch-btn.on {
+  background: rgba(47, 216, 255, 0.35);
+  border-color: var(--accent);
+}
+
+.touch-btn-lamp {
+  border-color: rgba(255, 210, 58, 0.6);
+}
+
+.touch-btn-attack {
+  border-color: rgba(255, 176, 48, 0.6);
+}
+
+.touch-btn-use {
+  border-color: rgba(53, 255, 154, 0.6);
+}
+
+.touch-btn-emp {
+  border-color: rgba(192, 123, 255, 0.7);
+}
+
+.touch-view {
+  position: absolute;
+  top: max(12px, var(--safe-t));
+  right: calc(max(12px, var(--safe-r)) + 62px);
+  width: 64px;
+  height: 52px;
+  border-radius: 10px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.touch-pause {
+  position: absolute;
+  top: max(12px, var(--safe-t));
+  right: max(12px, var(--safe-r));
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+body.touch .hud-bars {
+  bottom: auto;
+  top: calc(max(14px, var(--safe-t)) + 44px);
+  width: min(220px, 34vw);
+}
+
+body.touch #hud-prompt {
+  top: 38%;
+}
+
+body.touch #tutorial-objective {
+  top: auto;
+  bottom: max(12px, var(--safe-b));
+  max-width: 44vw;
+  font-size: 12px;
+}
+
+body.touch #tutorial-card {
+  width: min(600px, calc(100vw - 24px));
+  padding: 14px 16px 12px;
+}
+
+body.touch #tutorial-body p {
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+/* ---------- Orientation ---------- */
+#rotate-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  letter-spacing: 0.15em;
+  padding: 16px;
+}
+
+.rotate-icon {
+  font-size: 56px;
+  color: var(--accent);
+  animation: spin 2s ease-in-out infinite;
+}
+
+@keyframes spin {
+  50% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-overlay {
+    display: flex;
+  }
+}
+
+@media (max-height: 480px) {
+  .panel {
+    padding: 16px;
+    gap: 8px;
+  }
+  .tagline,
+  .hint {
+    display: none;
+  }
+  .btn {
+    padding: 10px 14px;
+  }
+}
