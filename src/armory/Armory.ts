@@ -30,6 +30,8 @@ export class Armory {
   private readonly panel: Mesh;
   private readonly lootGroup = new Group();
   private readonly ring: Mesh;
+  /** Glowing outline while the door can still be opened. */
+  private readonly highlight: Mesh;
   private readonly strip: Mesh;
   private readonly lampMaterial = new MeshBasicMaterial({ color: LOCKED_COLOR, toneMapped: false });
   private readonly slideDistance: number;
@@ -100,7 +102,10 @@ export class Armory {
     this.buildLoot(models);
     cache.add(crate, this.strip, this.ring, this.lootGroup);
 
-    this.root.add(this.panel, jambL, jambR, lintel, sign, lampL, lampR, cache);
+    this.highlight = new Mesh(a.highlight, a.highlightMaterial);
+    this.highlight.renderOrder = 2;
+
+    this.root.add(this.panel, jambL, jambR, lintel, sign, lampL, lampR, cache, this.highlight);
 
     // Door collider (axis aligned in world space, spans the corridor).
     const hy = wallH / 2;
@@ -132,6 +137,7 @@ export class Armory {
   open(): boolean {
     if (this.state !== 'closed') return false;
     this.state = 'opening';
+    this.highlight.visible = false;
     this.lampMaterial.color.setHex(OPEN_COLOR);
     return true;
   }

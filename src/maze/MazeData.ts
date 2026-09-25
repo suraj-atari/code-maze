@@ -11,6 +11,11 @@ export class MazeData {
   readonly cells: Uint8Array;
   startCell = 0;
   exitCell = 0;
+  /**
+   * Wall cells the player can walk into (open lab chambers). They stay walls for the AI, so
+   * robots neither see nor path into them: a place to hide.
+   */
+  readonly hideouts = new Set<number>();
 
   constructor(
     readonly width: number,
@@ -43,6 +48,11 @@ export class MazeData {
   /** Out-of-bounds counts as wall. */
   isWall(x: number, y: number): boolean {
     return !this.inBounds(x, y) || this.cells[y * this.width + x] === CellType.Wall;
+  }
+
+  /** Solid for the player's body and camera: a wall that is not a hideout. */
+  isBlocked(x: number, y: number): boolean {
+    return this.isWall(x, y) && !(this.inBounds(x, y) && this.hideouts.has(y * this.width + x));
   }
 
   isWalkable(index: number): boolean {

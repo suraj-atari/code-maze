@@ -73,10 +73,10 @@ export class ThirdPersonCamera {
     if (y < 0.15 || y > wallHeight - 0.15) return false;
     const s = maze.cellSize;
     return (
-      !maze.isWall(Math.floor((x - r) / s), Math.floor((z - r) / s)) &&
-      !maze.isWall(Math.floor((x + r) / s), Math.floor((z - r) / s)) &&
-      !maze.isWall(Math.floor((x - r) / s), Math.floor((z + r) / s)) &&
-      !maze.isWall(Math.floor((x + r) / s), Math.floor((z + r) / s))
+      !maze.isBlocked(Math.floor((x - r) / s), Math.floor((z - r) / s)) &&
+      !maze.isBlocked(Math.floor((x + r) / s), Math.floor((z - r) / s)) &&
+      !maze.isBlocked(Math.floor((x - r) / s), Math.floor((z + r) / s)) &&
+      !maze.isBlocked(Math.floor((x + r) / s), Math.floor((z + r) / s))
     );
   }
 }

@@ -16,6 +16,8 @@ export class RobotMemory {
   lookTime = 0;
   lookBase = 0;
   lostSightTimer = 0;
+  /** The current investigation answers a radio alert: move at alert speed. */
+  urgent = false;
   repathTimer = 0;
   route = new Int32Array(8);
   routeLength = 0;
@@ -37,6 +39,7 @@ export class RobotMemory {
     this.phase = Phase.Moving;
     this.timer = this.subTimer = this.lookTime = this.lookBase = 0;
     this.lostSightTimer = this.repathTimer = 0;
+    this.urgent = false;
     this.routeIndex = 0;
   }
 }

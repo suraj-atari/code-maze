@@ -49,6 +49,8 @@ export interface GameEvents {
   'player:footstep': FootstepEvent;
   'player:caught': { robotId: number };
   'robot:stateChanged': RobotStateEvent;
+  /** A robot that sees the player radioed the others (once per sighting streak). */
+  'robots:alerted': { responders: number };
   'level:loaded': LevelEvent;
   'level:unloaded': undefined;
   'level:exitReached': undefined;

@@ -35,6 +35,9 @@ export class RobotManager {
   private readonly destroyedEvent: RobotDestroyedEvent = { robotId: 0, cause: 'hammer', x: 0, y: 0, z: 0 };
   private nextId = 0;
   private caught = false;
+  private alertTimer = 0;
+  /** A chaser currently sees the player and is radioing the others. */
+  private alerting = false;
   private level: LevelConfig | null = null;
 
   constructor(
@@ -56,6 +59,8 @@ export class RobotManager {
     this.world.rng = rng;
     this.world.player = player;
     this.caught = false;
+    this.alerting = false;
+    this.alertTimer = 0;
     this.level = level;
 
     const plans = planRobotSpawns(maze.data, maze.pathfinder, level.robotCount, level.ai, rng);
@@ -104,6 +109,42 @@ export class RobotManager {
     this.maxSuspicion = maxSuspicion;
     this.chasingCount = chasing;
     this.nearestChaseDistance = nearest;
+    this.updateRadio(dt);
+  }
+
+  /**
+   * Pac-Man teamwork: while any chasing robot sees the player, it broadcasts the player's
+   * position every `ai.alertIntervalSeconds`; every other robot drops what it is doing and
+   * rushes to that spot. Losing sight ends the broadcast (hiding works).
+   */
+  private updateRadio(dt: number): void {
+    const ai = this.level?.ai;
+    if (!ai) return;
+    let spotter: Robot | null = null;
+    for (const r of this.active) {
+      if (!r.stunned && r.stateId === 'chase' && r.sensor.canSeePlayer) {
+        spotter = r;
+        break;
+      }
+    }
+    if (!spotter) {
+      this.alerting = false;
+      this.alertTimer = 0;
+      return;
+    }
+    this.alertTimer -= dt;
+    if (this.alertTimer > 0) return;
+    this.alertTimer = ai.alertIntervalSeconds;
+    const x = spotter.sensor.lastSeenX;
+    const z = spotter.sensor.lastSeenZ;
+    let responders = 0;
+    for (const r of this.active) {
+      if (r === spotter || r.stunned || r.stateId === 'chase') continue;
+      r.sensor.hearNoise(x, z, true);
+      responders++;
+    }
+    if (!this.alerting && responders > 0) this.events.emit('robots:alerted', { responders });
+    this.alerting = true;
   }
 
   /**

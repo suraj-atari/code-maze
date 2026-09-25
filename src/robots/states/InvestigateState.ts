@@ -6,7 +6,10 @@ import { beginLookAround, lookAround } from './shared';
 
 const REPATH_WHILE_WATCHING = 0.5;
 
-/** Move to a suspicious point (glimpse or noise), look around, then give up and return. */
+/**
+ * Move to a suspicious point (glimpse, noise or a radio alert: the player's last known
+ * position), look around, then give up and return. Alerts are answered at alert speed.
+ */
 export class InvestigateState implements State<RobotContext, RobotStateId> {
   readonly id = 'investigate' as const;
 
@@ -29,6 +32,7 @@ export class InvestigateState implements State<RobotContext, RobotStateId> {
     }
     if (s.consumeNoise()) {
       m.setTarget(s.noiseX, s.noiseZ);
+      m.urgent = m.urgent || s.noiseUrgent;
       this.goToTarget(ctx);
     }
 
@@ -51,7 +55,8 @@ export class InvestigateState implements State<RobotContext, RobotStateId> {
   private goToTarget(ctx: RobotContext): void {
     const m = ctx.memory;
     m.phase = Phase.Moving;
-    if (!ctx.controller.moveToPoint(m.targetX, m.targetZ, ctx.config.investigateSpeed)) {
+    const speed = m.urgent ? ctx.config.chaseSpeed * ctx.ai.alertSpeedFactor : ctx.config.investigateSpeed;
+    if (!ctx.controller.moveToPoint(m.targetX, m.targetZ, speed)) {
       ctx.controller.stop();
     }
   }

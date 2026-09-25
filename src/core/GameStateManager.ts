@@ -1,6 +1,8 @@
 export const GameState = {
   Loading: 'loading',
   MainMenu: 'menu',
+  /** Level intro cinematic: 2D map → 3D gameplay camera. */
+  Intro: 'intro',
   Playing: 'playing',
   Paused: 'paused',
   GameOver: 'gameover',
@@ -11,11 +13,12 @@ export type GameState = (typeof GameState)[keyof typeof GameState];
 
 const TRANSITIONS: Readonly<Record<GameState, readonly GameState[]>> = {
   loading: ['menu'],
-  menu: ['playing'],
-  playing: ['paused', 'gameover', 'complete', 'menu'],
+  menu: ['playing', 'intro'],
+  intro: ['playing', 'menu'],
+  playing: ['paused', 'gameover', 'complete', 'menu', 'intro'],
   paused: ['playing', 'menu'],
   gameover: ['playing', 'menu'],
-  complete: ['playing', 'menu'],
+  complete: ['playing', 'intro', 'menu'],
 };
 
 export type StateChangeListener = (next: GameState, previous: GameState) => void;

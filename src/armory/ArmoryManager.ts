@@ -68,6 +68,8 @@ export class ArmoryManager {
   ): void {
     const p = player.position;
     let prompt = false;
+    // Openable doors pulse so they read from down the corridor.
+    this.assets.highlightMaterial.opacity = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(time * 4));
     for (const a of this.armories) {
       if (a.closed) {
         const near = Math.hypot(p.x - a.doorX, p.z - a.doorZ) <= this.interactDistance;

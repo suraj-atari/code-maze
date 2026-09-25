@@ -3,7 +3,10 @@ import type { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/GameEvents';
 import { GameState } from '../core/GameStateManager';
 import type { TutorialCardView, TutorialView } from '../tutorial/TutorialDirector';
+import type { MazeData } from '../maze/MazeData';
+import { drawMazeMap } from '../maze/MazeMapImage';
 import { formatTime, Hud, type HudModel } from './Hud';
+import { IntroOverlay } from './IntroOverlay';
 import { TutorialPanel } from './TutorialPanel';
 
 /** Actions the UI can request. Implemented by Game; the UI never reaches into game objects. */
@@ -14,6 +17,7 @@ export interface UICommands {
   restart(): void;
   nextLevel(): void;
   quitToMenu(): void;
+  skipIntro(): void;
 }
 
 export interface RunSummary {
@@ -45,6 +49,9 @@ export class UIManager {
   private tutorialDone = false;
   private readonly touch: boolean;
   readonly tutorialPanel: TutorialPanel;
+  readonly intro: IntroOverlay;
+  /** Called when the player picks another difficulty in the menu (the map preview changes). */
+  onDifficultyChange: ((id: string) => void) | null = null;
   /** Surface the tutorial director draws on. */
   readonly tutorialView: TutorialView = {
     showCard: (c: TutorialCardView) => this.tutorialPanel.showCard(c),
@@ -62,6 +69,7 @@ export class UIManager {
     this.touch = touch;
     document.body.classList.toggle('touch', touch);
     this.tutorialPanel = new TutorialPanel(touch);
+    this.intro = new IntroOverlay(() => commands.skipIntro());
     this.selectedDifficulty = this.loadDifficulty(defaultDifficulty);
     this.buildDifficultyList();
     this.bindButtons();
@@ -73,6 +81,16 @@ export class UIManager {
       screen?.classList.toggle('hidden', key !== state);
     }
     this.hud.setVisible(state === GameState.Playing || state === GameState.Paused);
+    this.intro.setVisible(state === GameState.Intro);
+  }
+
+  get selectedDifficultyId(): string {
+    return this.selectedDifficulty;
+  }
+
+  /** Draws the map of the next run in the main menu. */
+  showMapPreview(maze: MazeData): void {
+    drawMazeMap(byId<HTMLCanvasElement>('menu-map'), maze, { cellPx: 8 });
   }
 
   setLoading(fraction: number, label: string): void {
@@ -116,12 +134,15 @@ export class UIManager {
       this.hud.toast(
         e.levelIndex === 0
           ? 'FIND THE KEYCARD IN THE SECURITY ROOM, THEN THE EXIT'
-          : 'NEW WING — MORE SENTINELS ONLINE. FIND THE KEYCARD',
+          : 'NEW WING — BIGGER, MORE AND FASTER SENTINELS. FIND THE KEYCARD',
         3.5,
       );
     });
     events.on('pickup:nullifier', () =>
       this.hud.toast(`ROBOT NULLIFIER ACQUIRED — ${this.touch ? 'TAP EMP' : 'PRESS R'} TO PARALYSE SENTINELS`, 3),
+    );
+    events.on('robots:alerted', (e) =>
+      this.hud.toast(`SPOTTED — ${e.responders} MORE SENTINEL${e.responders > 1 ? 'S' : ''} CLOSING IN. RUN AND HIDE!`, 2.5),
     );
     events.on('pickup:keycard', () => this.hud.toast('KEYCARD ACQUIRED — THE EXIT IS UNLOCKED', 3));
     events.on('level:exitLocked', () => this.hud.toast('EXIT LOCKED — FIND THE KEYCARD IN THE SECURITY ROOM', 2.5));
@@ -172,7 +193,9 @@ export class UIManager {
   }
 
   private selectDifficulty(id: string): void {
+    const changed = id !== this.selectedDifficulty;
     this.selectedDifficulty = id;
+    if (changed) this.onDifficultyChange?.(id);
     for (const b of byId('difficulty-list').querySelectorAll<HTMLElement>('.difficulty')) {
       b.setAttribute('aria-checked', String(b.dataset['id'] === id));
     }

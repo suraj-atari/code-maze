@@ -100,10 +100,12 @@ export class Weapons {
   }
 
   /** @param keepInventory carry supplies into the next wing of a run */
-  startLevel(maze: MazeData, wallHeight: number, keepInventory = false): void {
+  /** @param startKit a fresh inventory starts with `nullifier.startCharges` EMP pulses */
+  startLevel(maze: MazeData, wallHeight: number, keepInventory = false, startKit = false): void {
     const kept = [this.grenades, this.hammerHits, this.nullifiers] as const;
     this.clear();
     if (keepInventory) [this.grenades, this.hammerHits, this.nullifiers] = kept;
+    else if (startKit) this.nullifiers = this.deps.config.nullifier.startCharges;
     this.maze = maze;
     this.wallHeight = wallHeight;
   }

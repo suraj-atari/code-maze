@@ -13,6 +13,7 @@ import {
   TorusGeometry,
   type BufferGeometry,
 } from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { LootKind, MazeConfig } from '../config/types';
 
 export const DOOR_HEIGHT = 2.6;
@@ -175,6 +176,15 @@ export class ArmoryAssets {
   readonly crateMaterial = new MeshStandardMaterial({ color: 0x3a4526, metalness: 0.3, roughness: 0.7, emissive: 0x070904 });
   readonly stripOn = new MeshBasicMaterial({ color: 0xffb030, toneMapped: false });
   readonly stripOff = new MeshBasicMaterial({ color: 0x2a2418 });
+  /** Pulsing outline on doors that can still be opened (see ArmoryManager.update). */
+  readonly highlightMaterial = new MeshBasicMaterial({
+    color: 0xffc23a,
+    transparent: true,
+    opacity: 0.8,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
   readonly ringMaterial = new MeshBasicMaterial({
     color: 0xffb030,
     transparent: true,
@@ -187,6 +197,8 @@ export class ArmoryAssets {
   readonly door: BoxGeometry;
   readonly jamb: BoxGeometry;
   readonly lintel: BoxGeometry;
+  /** Glowing frame just in front of the door panel plus a light strip on the floor. */
+  readonly highlight: BufferGeometry;
   readonly sign = new PlaneGeometry(1.3, 0.32);
   readonly lamp = new BoxGeometry(0.09, 0.09, 0.03);
   readonly crate = new BoxGeometry(0.9, 0.5, 0.6);
@@ -237,7 +249,17 @@ export class ArmoryAssets {
     this.door = new BoxGeometry(s - 0.08, DOOR_HEIGHT, 0.14);
     this.jamb = new BoxGeometry(0.16, DOOR_HEIGHT, 0.46);
     this.lintel = new BoxGeometry(s, maze.wallHeight - DOOR_HEIGHT, 0.46);
+    const edge = s / 2 - 0.15;
+    const bars = [
+      new BoxGeometry(s - 0.3, 0.06, 0.02).translate(0, DOOR_HEIGHT - 0.05, 0.085),
+      new BoxGeometry(0.06, DOOR_HEIGHT - 0.1, 0.02).translate(-edge, DOOR_HEIGHT / 2, 0.085),
+      new BoxGeometry(0.06, DOOR_HEIGHT - 0.1, 0.02).translate(edge, DOOR_HEIGHT / 2, 0.085),
+      new PlaneGeometry(s - 0.3, 0.3).rotateX(-Math.PI / 2).translate(0, 0.015, 0.45),
+    ].map((g) => (g.index ? g.toNonIndexed() : g));
+    this.highlight = mergeGeometries(bars, false)!;
+    for (const g of bars) g.dispose();
     this.geometries = [
+      this.highlight,
       this.door,
       this.jamb,
       this.lintel,
@@ -269,6 +291,7 @@ export class ArmoryAssets {
       this.stripOn,
       this.stripOff,
       this.ringMaterial,
+      this.highlightMaterial,
     ]) {
       m.dispose();
     }

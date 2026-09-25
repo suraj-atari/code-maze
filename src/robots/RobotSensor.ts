@@ -8,8 +8,10 @@ import type { RobotController } from './RobotController';
  * Vision + hearing. Evaluated at `ai.sensorHz` (staggered per robot), not every frame.
  *  - Vision: cone (FOV) × range, range shrinks when the player's lamp is off or they crouch;
  *    blocked by walls (grid line-of-sight); short proximity sense ignores facing.
- *  - Suspicion builds while the player is visible (faster when close) and decays otherwise.
+ *  - Suspicion builds while the player is visible (faster when close) and decays otherwise;
+ *    with `ai.chaseOnSight` any sighting is instantly certain (straight to Chase).
  *  - Hearing: player noise radius × robot hearing, attenuated through walls. Latched until consumed.
+ *    Radio alerts from other robots arrive through `hearNoise(…, urgent)`.
  */
 export class RobotSensor {
   canSeePlayer = false;
@@ -21,6 +23,8 @@ export class RobotSensor {
   noiseX = 0;
   noiseZ = 0;
   private noisePending = false;
+  /** The pending noise is a radio alert from another robot (answer it in a hurry). */
+  noiseUrgent = false;
   private accumulator = 0;
   private losState = -1;
 
@@ -43,9 +47,13 @@ export class RobotSensor {
     return had;
   }
 
-  /** An external loud noise (e.g. an explosion) the robot should investigate. */
-  hearNoise(x: number, z: number): void {
+  /**
+   * An external loud noise (e.g. an explosion) the robot should investigate.
+   * @param urgent a radio alert from another robot that has the player in sight
+   */
+  hearNoise(x: number, z: number, urgent = false): void {
     this.noisePending = true;
+    this.noiseUrgent = urgent;
     this.noiseX = x;
     this.noiseZ = z;
   }
@@ -86,7 +94,10 @@ export class RobotSensor {
     this.canSeePlayer = visible;
     if (visible) {
       const closeness = 1 - Math.min(1, dist / Math.max(range, 0.01));
-      this.suspicion = Math.min(1, this.suspicion + ai.suspicionGain * dt * (0.5 + 1.5 * closeness));
+      // Pac-Man rules: one look and it comes for you.
+      this.suspicion = ai.chaseOnSight
+        ? 1
+        : Math.min(1, this.suspicion + ai.suspicionGain * dt * (0.5 + 1.5 * closeness));
       this.lastSeenX = p.x;
       this.lastSeenZ = p.z;
     } else {
@@ -98,6 +109,7 @@ export class RobotSensor {
       if (dist <= hearing && !this.hasLos(world, r, p)) hearing *= ai.occludedHearingFactor;
       if (dist <= hearing) {
         this.noisePending = true;
+        this.noiseUrgent = false;
         this.noiseX = p.x;
         this.noiseZ = p.z;
       }

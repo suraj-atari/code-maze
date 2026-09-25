@@ -30,6 +30,8 @@ export function tutorialLevelConfig(config: GameConfig): LevelConfig {
   return {
     ...base,
     robotCount: 0,
+    // Training teaches sneaking with the detection meter: sightings build up instead of instant chases.
+    ai: { ...base.ai, chaseOnSight: false },
     maze: { ...base.maze, generator: TUTORIAL_GENERATOR },
     tutorial: true,
     fixedArmories: [{ cell: cellOf('armory'), entrance: cellOf('armoryEntrance') }],

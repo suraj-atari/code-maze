@@ -41,6 +41,8 @@ export function resolveLevelConfig(
   const n = levelIndex;
   const speed = Math.min(p.maxRobotSpeed, difficulty.robotSpeed + n * p.robotSpeedStep);
   const r = config.robot;
+  // A chasing robot never outruns a sprinting player: escaping (and hiding) must stay possible.
+  const maxChase = config.player.sprintSpeed * config.ai.maxChaseSpeedFactor;
 
   return {
     levelIndex,
@@ -62,7 +64,7 @@ export function resolveLevelConfig(
       patrolSpeed: r.patrolSpeed * speed,
       investigateSpeed: r.investigateSpeed * speed,
       searchSpeed: r.searchSpeed * speed,
-      chaseSpeed: r.chaseSpeed * speed,
+      chaseSpeed: Math.min(maxChase, r.chaseSpeed * speed),
       returnSpeed: r.returnSpeed * speed,
     },
     ai: {

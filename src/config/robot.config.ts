@@ -9,7 +9,8 @@ export const robotConfig: RobotConfig = {
   chaseSpeed: 4.3,
   returnSpeed: 1.9,
   turnSpeed: 4.5,
-  catchRadius: 1.05,
+  // Robot radius + player radius (+ a hair): caught only when the robot actually touches you.
+  catchRadius: 0.82,
   eyeLight: { intensity: 22, range: 10, angleDeg: 28 },
   stateColors: {
     patrol: 0x2fd8ff,

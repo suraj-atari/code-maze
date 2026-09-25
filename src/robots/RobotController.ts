@@ -3,6 +3,13 @@ import type { PhysicsSystem, RigidBody } from '../physics/PhysicsSystem';
 import { clamp, wrapAngle } from '../utils/math';
 import type { RobotWorld } from './RobotContext';
 
+const NEIGHBOURS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
 /**
  * Locomotion for a robot: follows grid paths from the shared Pathfinder, turns smoothly,
  * slows down while turning, and drives a kinematic Rapier body so the player collides with it.
@@ -71,10 +78,24 @@ export class RobotController {
     return true;
   }
 
-  /** Paths to an exact world point (must be inside a walkable cell). */
+  /**
+   * Paths to an exact world point. A point inside a wall (the player hiding in a lab room) sends
+   * the robot to the walkable cell next to it instead, where it waits at the door.
+   */
   moveToPoint(x: number, z: number, speed: number): boolean {
-    const cell = this.world.maze.cellAt(x, z);
-    if (cell < 0 || !this.world.maze.isWalkable(cell) || !this.moveToCell(cell, speed)) return false;
+    const maze = this.world.maze;
+    const cell = maze.cellAt(x, z);
+    if (cell < 0) return false;
+    if (!maze.isWalkable(cell)) {
+      const cx = maze.cellX(cell);
+      const cy = maze.cellY(cell);
+      for (const [dx, dy] of NEIGHBOURS) {
+        if (maze.isWall(cx + dx, cy + dy)) continue;
+        return this.moveToCell(maze.index(cx + dx, cy + dy), speed);
+      }
+      return false;
+    }
+    if (!this.moveToCell(cell, speed)) return false;
     this.finalX = x;
     this.finalZ = z;
     return true;

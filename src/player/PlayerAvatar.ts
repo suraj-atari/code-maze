@@ -43,7 +43,8 @@ export class PlayerAvatar {
     root.rotation.y = player.yaw;
     const pose = this.pose;
     pose.speed = player.speed;
-    pose.sprinting = player.sprinting;
+    // The default pace is a run: animate it as one.
+    pose.sprinting = player.sprinting || player.speed > 4;
     pose.crouching = player.crouching;
     pose.pitch = player.pitch;
     pose.hasHammer = hasHammer;

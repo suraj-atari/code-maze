@@ -3,17 +3,19 @@ import type { RobotContext } from '../RobotContext';
 
 /**
  * Common "calm state" perception transitions (Patrol / Return / Search):
- * certain sighting → Chase; partial sighting or a noise → Investigate.
+ * certain sighting → Chase; partial sighting, a noise or a radio alert → Investigate.
  */
 export function perceptionTransition(ctx: RobotContext): RobotStateId | null {
   const s = ctx.sensor;
   if (s.alerted) return 'chase';
   if (s.canSeePlayer && s.suspicion >= ctx.ai.investigateThreshold) {
     ctx.memory.setTarget(s.lastSeenX, s.lastSeenZ);
+    ctx.memory.urgent = false;
     return 'investigate';
   }
   if (s.consumeNoise()) {
     ctx.memory.setTarget(s.noiseX, s.noiseZ);
+    ctx.memory.urgent = s.noiseUrgent;
     return 'investigate';
   }
   return null;

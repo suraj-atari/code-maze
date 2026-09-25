@@ -34,6 +34,9 @@ Rules that keep it modular:
   (grid line-of-sight + BFS), so AI is independent of both rendering and Rapier.
 * **All tunables live in `src/config/`.** `resolveLevelConfig(difficulty, levelIndex)` merges the base
   configs with a `DifficultyConfig` and its progression curve, so adding a difficulty is data-only.
+* **Hideouts.** Lab rooms (1 × 2 cells, door in the front cell) are wall cells in `MazeData` marked in `hideouts`: the AI (`isWall`) can't see or path into them (a chase ends at the door), the player's physics and camera (`isBlocked`) walk in through a sliding door that opens as they approach and shuts behind them once inside (visual only).
+* **Radio.** While a chasing robot sees the player, `RobotManager` broadcasts the position every `ai.alertIntervalSeconds`; the others get it as an urgent noise and rush there (Investigate at `alertSpeedFactor` × chase speed).
+* **Pac-Man chase.** With `ai.chaseOnSight` one sighting sends a robot straight into Chase; chase speed is capped below the player's sprint (`ai.maxChaseSpeedFactor`), and you're caught only on contact (`robot.catchRadius`).
 * **Game states** are owned by `GameStateManager` with an explicit transition table — no scattered flags.
 * **Composition over inheritance.** `Robot` = `RobotController` + `RobotSensor` + `RobotStateMachine`
   + `RobotView`; its behaviour is a set of *stateless* `State` objects registered by `RobotBehaviour`
@@ -56,9 +59,10 @@ Rules that keep it modular:
 | `lighting/`   | `LightingSystem` (ambient darkness, fog, pooled flash lights), `LampLight` (camera spotlight). |
 | `effects/`    | `ParticleSystem` (single `Points` draw call, pooled particles), `EffectsManager`. |
 | `audio/`      | `AudioManager` (context unlock, buses, pooled voices, positional audio), `SoundLibrary` (procedural buffers), `GameAudio` (event → sound bridge, loops, heartbeat). |
+| `intro/`      | `IntroCinematic` – new-run intro (~9 s): flat 2D map (`maze/MazeMapImage`) with YOU/EXIT markers → flat 3D board (green caps, sandy floor) → eased dive onto the player while walls rise, the view rolls upright and the lens widens; lands on the gameplay camera (`GameState.Intro`). |
 | `level/`      | `LevelManager` (build/teardown/progression), `Level`, `ExitZone`. |
 | `pooling/`    | `ObjectPool<T>`, `ObjectPoolManager` (stats for debug). |
-| `ui/`         | `UIManager` + screens (loading, menu, HUD, pause, game over, level complete). DOM lives only here and in `input/`. |
+| `ui/`         | `UIManager` + screens (loading, menu, HUD, pause, game over, level complete), `Compass` (heading-up radar: goal bearing/distance, robot blips from periodic pings; fed by `Game.updateCompass`). DOM lives only here and in `input/`. |
 | `debug/`      | `DebugSystem` — dynamically imported only in dev or with `?debug`, so production bundles don't include it. |
 
 ## Frame (state = Playing)

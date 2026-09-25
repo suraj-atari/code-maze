@@ -4,14 +4,15 @@ export const armoryConfig: ArmoryConfig = {
   perLevel: 4,
   roomsPerDeadEnd: 0.7,
   maxRooms: 14,
-  nullifierShare: 0.3,
+  nullifierShare: 0.5,
+  labRoomNullifierShare: 0.4,
   minStartDistanceCells: 3,
   spacingCells: 3,
   doorOpenSeconds: 0.9,
   robotOpenDistance: 1.7,
   pickupRadius: 1.4,
   loot: { grenades: 2, hammerHits: 3 },
-  nullifierCharges: 1,
+  nullifierCharges: 2,
 };
 
 export const weaponsConfig: WeaponsConfig = {
@@ -28,5 +29,5 @@ export const weaponsConfig: WeaponsConfig = {
     blastRadius: 4.5,
     cooldown: 0.8,
   },
-  nullifier: { maxCharges: 3, radius: 11, stunSeconds: 4, cooldown: 1 },
+  nullifier: { maxCharges: 6, startCharges: 3, radius: 11, stunSeconds: 4, cooldown: 1 },
 };

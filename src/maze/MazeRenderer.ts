@@ -11,12 +11,14 @@ import {
   type Texture,
 } from 'three';
 import type { MazeConfig } from '../config/types';
-import { LabChambers, pickChambers } from './LabChambers';
+import { LabChambers, type Chamber } from './LabChambers';
 import type { MazeData } from './MazeData';
 
 export interface MazeTextures {
   readonly wall: Texture;
   readonly wallEmissive: Texture;
+  /** Opacity of the window glass layer. */
+  readonly wallGlass: Texture;
   readonly floor: Texture;
   readonly ceiling: Texture;
   readonly ceilingEmissive: Texture;
@@ -27,29 +29,36 @@ export interface MazeTextures {
  *  - Walls: one InstancedMesh per spatial chunk (chunkCells²) so the renderer can frustum-cull
  *    whole chunks; wall cells that touch no floor are skipped entirely.
  *  - Floor & ceiling: a single plane each, UVs scaled so textures tile once per cell.
- *  - Lab chambers: some wall cells are drawn as glass-walled labs (see LabChambers) instead of
- *    solid blocks; they remain walls for physics and AI.
+ *  - Each wall face has a glass window: the wall material cuts the pane out of the texture
+ *    (alphaTest, so it stays an opaque, depth-sorted draw) and a second, transparent glass
+ *    material on the same instanced mesh fills it. Robots still cannot see through (grid AI).
+ *  - Lab chambers: some wall cells are drawn as lab rooms with a sliding door (see LabChambers)
+ *    instead of solid blocks; the player can walk in, the AI still treats them as walls.
  */
 export class MazeRenderer {
   readonly root = new Group();
   private readonly wallGeometry: BoxGeometry;
   private readonly wallMaterial: MeshStandardMaterial;
+  /** Tinted glass drawn over the window cut out of every wall face. */
+  private readonly glassMaterial: MeshStandardMaterial;
+  /** Lab rooms: the same wall, but with the window pane opaque so hideouts stay private. */
+  private readonly roomWallMaterial: MeshStandardMaterial;
   private readonly floorMaterial: MeshStandardMaterial;
   private readonly ceilingMaterial: MeshStandardMaterial;
   private readonly planeGeometries: PlaneGeometry[] = [];
   private readonly chunks: InstancedMesh[] = [];
-  private readonly chamberCells: ReadonlySet<number>;
   private readonly chambers: LabChambers;
 
   constructor(
     private readonly maze: MazeData,
+    chambers: readonly Chamber[],
     private readonly config: MazeConfig,
     textures: MazeTextures,
     private readonly shadows: boolean,
   ) {
     this.root.name = 'maze';
     const s = maze.cellSize;
-    this.wallGeometry = new BoxGeometry(s, config.wallHeight, s);
+    this.wallGeometry = wallBox(s, config.wallHeight);
     this.wallMaterial = new MeshStandardMaterial({
       map: textures.wall,
       emissiveMap: textures.wallEmissive,
@@ -58,7 +67,18 @@ export class MazeRenderer {
       emissiveIntensity: 1,
       roughness: 0.62,
       metalness: 0.25,
+      alphaTest: 0.5,
     });
+    this.glassMaterial = new MeshStandardMaterial({
+      color: 0xa8e4ee,
+      alphaMap: textures.wallGlass,
+      transparent: true,
+      depthWrite: false,
+      roughness: 0.2,
+      metalness: 0.1,
+    });
+    this.roomWallMaterial = this.wallMaterial.clone();
+    this.roomWallMaterial.alphaTest = 0;
     this.floorMaterial = new MeshStandardMaterial({ map: textures.floor, roughness: 0.7, metalness: 0.15 });
     // Ceiling carries glowing fluorescent panels like a lit lab corridor.
     this.ceilingMaterial = new MeshStandardMaterial({
@@ -70,9 +90,7 @@ export class MazeRenderer {
       metalness: 0.05,
     });
 
-    const chambers = pickChambers(maze);
-    this.chamberCells = new Set(chambers.map((c) => c.index));
-    this.chambers = new LabChambers(maze, chambers, s, config.wallHeight);
+    this.chambers = new LabChambers(maze, chambers, s, config.wallHeight, this.roomWallMaterial);
     this.root.add(this.chambers.root);
 
     this.buildWalls();
@@ -82,16 +100,22 @@ export class MazeRenderer {
   /** Emissive light strips and ceiling panels fade as the level gets darker. */
   setEmissiveIntensity(value: number): void {
     this.wallMaterial.emissiveIntensity = value;
+    this.roomWallMaterial.emissiveIntensity = value;
     this.ceilingMaterial.emissiveIntensity = value;
+  }
+
+  /** Animates the lab room doors around the player. */
+  update(dt: number, playerX: number, playerZ: number): void {
+    this.chambers.update(dt, playerX, playerZ);
   }
 
   get drawCallEstimate(): number {
     return this.chunks.length + 2 + this.chambers.drawCallEstimate;
   }
 
-  /** Chamber cells are walls for physics, but see-through for rendering. */
+  /** Chamber cells (hideouts) are walls for the AI, but open for rendering. */
   private isSolid(x: number, y: number): boolean {
-    return this.maze.isWall(x, y) && !(this.maze.inBounds(x, y) && this.chamberCells.has(this.maze.index(x, y)));
+    return this.maze.isBlocked(x, y);
   }
 
   private isVisibleWall(x: number, y: number): boolean {
@@ -118,7 +142,7 @@ export class MazeRenderer {
         for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (this.isVisibleWall(x, y)) count++;
         if (count === 0) continue;
 
-        const mesh = new InstancedMesh(this.wallGeometry, this.wallMaterial, count);
+        const mesh = new InstancedMesh(this.wallGeometry, [this.wallMaterial, this.glassMaterial], count);
         mesh.name = `walls-${cx}-${cy}`;
         let i = 0;
         for (let y = y0; y < y1; y++) {
@@ -171,7 +195,25 @@ export class MazeRenderer {
     for (const g of this.planeGeometries) g.dispose();
     // Textures are owned by the AssetManager and shared across levels.
     this.wallMaterial.dispose();
+    this.glassMaterial.dispose();
+    this.roomWallMaterial.dispose();
     this.floorMaterial.dispose();
     this.ceilingMaterial.dispose();
   }
+}
+
+/**
+ * Wall block with two draw groups over all faces (0: wall, 1: window glass). Top and bottom
+ * faces sample a plain spot of the header trim, so no window is punched into them.
+ */
+function wallBox(size: number, height: number): BoxGeometry {
+  const geo = new BoxGeometry(size, height, size);
+  const uv = geo.getAttribute('uv') as BufferAttribute;
+  // BoxGeometry faces: +X, -X, +Y, -Y, +Z, -Z, four vertices each.
+  for (let i = 8; i < 16; i++) uv.setXY(i, 0.5, 0.9);
+  const count = geo.index!.count;
+  geo.clearGroups();
+  geo.addGroup(0, count, 0);
+  geo.addGroup(0, count, 1);
+  return geo;
 }

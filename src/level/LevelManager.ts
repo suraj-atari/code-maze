@@ -13,6 +13,7 @@ import type { Player } from '../player/Player';
 import type { RobotManager } from '../robots/RobotManager';
 import { Random } from '../utils/Random';
 import type { Weapons } from '../weapons/Weapons';
+import { EmpCaches } from './EmpCaches';
 import { ExitZone } from './ExitZone';
 import { Level } from './Level';
 
@@ -28,6 +29,8 @@ export interface LevelManagerDeps {
   readonly armory: ArmoryManager;
   readonly weapons: Weapons;
   readonly events: EventBus<GameEvents>;
+  /** Fraction of lab rooms holding an EMP cell. */
+  readonly labRoomNullifierShare: number;
 }
 
 /**
@@ -39,8 +42,10 @@ export class LevelManager {
   /** True while the player is close enough to the exit to see the "escape" prompt. */
   exitPromptVisible = false;
   private lockedNoticeCooldown = 0;
+  private readonly empCaches: EmpCaches;
 
   constructor(private readonly deps: LevelManagerDeps) {
+    this.empCaches = new EmpCaches(deps.scene, deps.events);
     deps.events.on('pickup:keycard', () => {
       if (!this.level) return;
       this.level.hasKeycard = true;
@@ -82,9 +87,11 @@ export class LevelManager {
     d.player.spawn(data.centerX(start), data.centerZ(start), yaw);
     d.player.lamp.reset(config.lamp, true);
     d.lampLight.configure(config.lamp);
-    d.weapons.startLevel(data, config.maze.wallHeight, carryOver);
+    // A new run starts with a full set of EMP pulses (not in the scripted training).
+    d.weapons.startLevel(data, config.maze.wallHeight, carryOver, !config.tutorial);
 
     d.armory.spawnForLevel(data, rng, config.fixedArmories);
+    if (!config.tutorial) this.empCaches.spawn(data, maze.chambers, d.labRoomNullifierShare, config.seed);
 
     d.robots.spawnForLevel(config, maze, d.player, rng);
 
@@ -104,6 +111,7 @@ export class LevelManager {
     if (!this.level) return;
     this.deps.robots.clear();
     this.deps.armory.clear();
+    this.empCaches.clear();
     this.deps.weapons.clear();
     this.deps.player.despawn();
     this.deps.lighting.clearFlashes();
@@ -122,6 +130,8 @@ export class LevelManager {
     this.lockedNoticeCooldown -= dt;
 
     const p = this.deps.player.position;
+    level.maze.renderer.update(dt, p.x, p.z);
+    this.empCaches.update(time, p.x, p.z);
     const dist = level.exit.distanceTo(p.x, p.z);
     this.exitPromptVisible = dist <= level.config.player.interactDistance;
     const entering = dist < level.maze.data.cellSize * 0.3 || (this.exitPromptVisible && interactPressed);

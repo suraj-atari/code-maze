@@ -102,6 +102,17 @@ export interface AIConfig {
   readonly hearingMultiplier: number;
   /** Noise radius multiplier when there is no line of sight (walls). */
   readonly occludedHearingFactor: number;
+  /** Any sighting makes the robot certain at once and it chases (Pac-Man style). */
+  readonly chaseOnSight: boolean;
+  /**
+   * Pac-Man radio: while a chasing robot sees the player it broadcasts their position every
+   * this many seconds, and every other robot rushes there.
+   */
+  readonly alertIntervalSeconds: number;
+  /** Speed of a robot answering an alert, as a fraction of its chase speed. */
+  readonly alertSpeedFactor: number;
+  /** Chase speed is capped at this fraction of the player's sprint speed, so escaping is possible. */
+  readonly maxChaseSpeedFactor: number;
   /** Suspicion gained per second while the player is visible (0..1 scale). */
   readonly suspicionGain: number;
   readonly suspicionDecay: number;
@@ -209,6 +220,8 @@ export interface ArmoryConfig {
   readonly maxRooms: number;
   /** Fraction of the non-keycard rooms that hold a robot nullifier (at least one per wing). */
   readonly nullifierShare: number;
+  /** Fraction of the lab rooms (hideouts) with an EMP cell (+1 nullifier charge) lying inside. */
+  readonly labRoomNullifierShare: number;
   /** Minimum path distance (cells) from the player start. */
   readonly minStartDistanceCells: number;
   /** Minimum Manhattan distance (cells) between two armories. */
@@ -247,6 +260,8 @@ export interface WeaponsConfig {
   /** EMP pulse that paralyses every robot in radius (no line of sight needed). */
   readonly nullifier: {
     readonly maxCharges: number;
+    /** EMP pulses the player starts every run with. */
+    readonly startCharges: number;
     readonly radius: number;
     readonly stunSeconds: number;
     readonly cooldown: number;

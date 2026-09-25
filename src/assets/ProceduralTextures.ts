@@ -4,6 +4,7 @@ import { Random } from '../utils/Random';
 export const TextureKeys = {
   Wall: 'wall',
   WallEmissive: 'wall-emissive',
+  WallGlass: 'wall-glass',
   Floor: 'floor',
   Ceiling: 'ceiling',
   CeilingEmissive: 'ceiling-emissive',
@@ -39,14 +40,18 @@ function toTexture(canvas: HTMLCanvasElement, anisotropy: number): CanvasTexture
 // A wall face is 2.6 m × 3.2 m, so the wall maps use the same aspect ratio.
 const WALL_W = 256;
 const WALL_H = 320;
-// Lab wall layout (shared by the colour and emissive maps): an upper panel holding a
-// meshed server cabinet, a row of lower cabinet doors, and a service pillar with light slots.
+// Lab wall layout (shared by the colour, emissive and glass maps): an upper panel holding a
+// glass window, a row of lower cabinet doors, and a service pillar with light slots.
 const CAB = { x: 34, y: 70, w: 120, h: 118 };
 const PILLAR = { x: 196, w: 48 };
 const SLOTS = [80, 118, 156, 194, 232] as const;
 const LOWER = { y: 212, h: 72 };
 
-/** Sci-fi lab wall panelling (cabinets, meshed server bay, pillar with light slots, pipe baseboard). */
+/**
+ * Sci-fi lab wall panelling (cabinets, window, pillar with light slots, pipe baseboard).
+ * The window pane has alpha < 0.5: the wall material cuts it out (alphaTest) and a glass layer
+ * (see `wallGlass`) is drawn there instead. Its colour is a dark tint, for opaque uses of the map.
+ */
 function wallColor(rng: Random): HTMLCanvasElement {
   const [c, ctx] = makeCanvas(WALL_W, WALL_H);
   ctx.fillStyle = '#5b6c70';
@@ -75,14 +80,12 @@ function wallColor(rng: Random): HTMLCanvasElement {
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(14, 52, 172, 3);
 
-  // Meshed server cabinet with a riveted border and a status slot.
+  // Window with a riveted frame; the pane itself is (almost) transparent.
   ctx.fillStyle = '#141a1c';
   ctx.fillRect(CAB.x - 8, CAB.y - 8, CAB.w + 16, CAB.h + 16);
-  ctx.fillStyle = '#1d2427';
+  ctx.clearRect(CAB.x, CAB.y, CAB.w, CAB.h);
+  ctx.fillStyle = 'rgba(38, 62, 70, 0.3)';
   ctx.fillRect(CAB.x, CAB.y, CAB.w, CAB.h);
-  ctx.fillStyle = '#2b3437';
-  for (let x = CAB.x; x < CAB.x + CAB.w; x += 4) ctx.fillRect(x, CAB.y, 1, CAB.h);
-  for (let y = CAB.y; y < CAB.y + CAB.h; y += 4) ctx.fillRect(CAB.x, y, CAB.w, 1);
   ctx.fillStyle = '#56666a';
   for (let i = 0; i <= 10; i++) {
     const t = i / 10;
@@ -95,10 +98,6 @@ function wallColor(rng: Random): HTMLCanvasElement {
       ctx.fillRect(x - 1, y - 1, 2, 2);
     }
   }
-  ctx.fillStyle = '#0c0f10';
-  ctx.fillRect(CAB.x + CAB.w - 22, CAB.y + 38, 8, 34);
-  ctx.fillStyle = '#6b5a1c';
-  ctx.fillRect(CAB.x + 6, CAB.y + CAB.h - 10, 6, 6);
 
   // Lower cabinet doors with handles.
   const doorW = 176 / 3;
@@ -141,15 +140,40 @@ function wallEmissive(): HTMLCanvasElement {
   const [c, ctx] = makeCanvas(WALL_W, WALL_H);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, WALL_W, WALL_H);
-  // Red status bar on the server cabinet.
-  ctx.fillStyle = '#ff2a22';
-  ctx.fillRect(CAB.x + CAB.w - 20, CAB.y + 46, 4, 18);
   // Dim yellow pillar slots.
   ctx.fillStyle = '#6e5518';
   for (const y of SLOTS) ctx.fillRect(PILLAR.x + 20, y - 10, 8, 20);
   // Dim yellow floor strip.
   ctx.fillStyle = '#7a5f1a';
   ctx.fillRect(0, 313, WALL_W, 4);
+  return c;
+}
+
+/**
+ * Opacity (alpha map, green channel) of the glass layer: faint inside the window with a few
+ * brighter diagonal streaks so the pane reads as glass; zero everywhere else.
+ */
+function wallGlass(): HTMLCanvasElement {
+  const [c, ctx] = makeCanvas(WALL_W, WALL_H);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, WALL_W, WALL_H);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(CAB.x, CAB.y, CAB.w, CAB.h);
+  ctx.clip();
+  ctx.fillStyle = 'rgb(44, 44, 44)';
+  ctx.fillRect(CAB.x, CAB.y, CAB.w, CAB.h);
+  ctx.fillStyle = 'rgb(96, 96, 96)';
+  for (const [offset, width] of [[10, 16], [38, 5], [78, 10]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(CAB.x + offset, CAB.y + CAB.h);
+    ctx.lineTo(CAB.x + offset + width, CAB.y + CAB.h);
+    ctx.lineTo(CAB.x + offset + width + CAB.h * 0.6, CAB.y);
+    ctx.lineTo(CAB.x + offset + CAB.h * 0.6, CAB.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   return c;
 }
 
@@ -249,6 +273,7 @@ export function createProceduralTextures(anisotropy: number): Record<string, Can
   return {
     [TextureKeys.Wall]: toTexture(wallColor(rng), anisotropy),
     [TextureKeys.WallEmissive]: toTexture(wallEmissive(), anisotropy),
+    [TextureKeys.WallGlass]: toTexture(wallGlass(), anisotropy),
     [TextureKeys.Floor]: toTexture(floorColor(rng), anisotropy),
     [TextureKeys.Ceiling]: toTexture(ceilingColor(rng), anisotropy),
     [TextureKeys.CeilingEmissive]: toTexture(ceilingEmissive(), anisotropy),

@@ -1,6 +1,7 @@
 import type { MazeConfig } from '../config/types';
 import type { PhysicsSystem } from '../physics/PhysicsSystem';
 import type { Random } from '../utils/Random';
+import { pickChambers, type Chamber } from './LabChambers';
 import type { MazeData } from './MazeData';
 import { createMazeGenerator, registerMazeGenerator } from './MazeGenerator';
 import { MazePhysics } from './MazePhysics';
@@ -26,21 +27,34 @@ export interface MazeBuildParams {
 export class Maze {
   private constructor(
     readonly data: MazeData,
+    /** Lab rooms (hideouts) with their door directions. */
+    readonly chambers: readonly Chamber[],
     readonly renderer: MazeRenderer,
     readonly physics: MazePhysics,
     readonly pathfinder: Pathfinder,
   ) {}
 
+  /**
+   * Generates the maze layout only (no visuals, physics or chambers). Same rooms/config/seed →
+   * same layout as `build`, so the menu can preview the map the next run will use.
+   */
+  static generate(rooms: number, config: MazeConfig, rng: Random): MazeData {
+    const generator = createMazeGenerator(config.generator);
+    return generator.generate({ rooms, cellSize: config.cellSize, braidFactor: config.braidFactor }, rng);
+  }
+
   static build(p: MazeBuildParams): Maze {
-    const generator = createMazeGenerator(p.config.generator);
-    const data = generator.generate(
-      { rooms: p.rooms, cellSize: p.config.cellSize, braidFactor: p.config.braidFactor },
-      p.rng,
-    );
+    const data = Maze.generate(p.rooms, p.config, p.rng);
+    const chambers = pickChambers(data);
+    for (const c of chambers) {
+      data.hideouts.add(c.index);
+      data.hideouts.add(c.backIndex);
+    }
     return new Maze(
       data,
-      new MazeRenderer(data, p.config, p.textures, p.shadows),
-      new MazePhysics(p.physics, data, p.config),
+      chambers,
+      new MazeRenderer(data, chambers, p.config, p.textures, p.shadows),
+      new MazePhysics(p.physics, data, chambers, p.config),
       new Pathfinder(data),
     );
   }

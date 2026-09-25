@@ -71,6 +71,10 @@
           <span id="tutorial-objective-step"></span>
           <span id="tutorial-objective-text"></span>
         </div>
+        <div id="hud-compass" aria-hidden="true">
+          <canvas></canvas>
+          <div class="compass-label"><span class="compass-name">EXIT</span> <span class="compass-value"></span></div>
+        </div>
         <div id="hud-crosshair"></div>
         <div id="hud-prompt" class="hidden"></div>
         <div id="hud-toast"></div>
@@ -83,6 +87,17 @@
           <button id="tutorial-continue" class="btn primary" type="button">CONTINUE</button>
           <div id="tutorial-hint"></div>
         </div>
+      </div>
+
+      <div id="intro-overlay" class="hidden" aria-live="polite">
+        <div id="intro-fade"></div>
+        <div class="intro-text">
+          <h2 class="intro-title">ESCAPE THE LAB</h2>
+          <p class="intro-sub">You are trapped in the facility maze. Find the path to the <b>EXIT</b> — stay out of the sentinels' sight.</p>
+        </div>
+        <div id="intro-you" class="intro-marker you">YOU</div>
+        <div id="intro-exit" class="intro-marker exit">EXIT</div>
+        <div class="intro-skip">CLICK · TAP · SPACE TO SKIP</div>
       </div>
 
       <section id="screen-loading" class="screen">
@@ -100,6 +115,13 @@
             You wake up inside a sealed research labyrinth. The sentinels are still running.
             Find the exit. Stay out of their light.
           </p>
+          <figure class="map-preview">
+            <canvas id="menu-map" aria-label="Map of the facility you are about to enter"></canvas>
+            <figcaption>
+              <span class="legend you">YOU</span><span class="legend exit">EXIT</span>
+              <span class="muted">Find the path out of the lab.</span>
+            </figcaption>
+          </figure>
           <div id="difficulty-list" class="difficulty-list" role="radiogroup" aria-label="Difficulty"></div>
           <button id="btn-start" class="btn primary">ENTER THE MAZE</button>
           <button id="btn-tutorial" class="btn">GAME PLAY TUTORIAL</button>
@@ -112,6 +134,10 @@
             <span><b>LAMP · RUN · SNEAK · USE · SMASH · THROW · EMP</b> buttons</span><span><b>VIEW</b> 1st/3rd person</span>
           </div>
           <p class="hint muted">Lamp on: you see further — so do they. Running is loud.</p>
+          <p class="hint muted">You always move at a run — hold <b>Shift</b> for a burst. Doors you can open glow yellow. Every wing is bigger and its sentinels faster.</p>
+          <p class="hint muted">If a sentinel sees you, it comes straight for you — run! Duck through a lab room door to hide: they cannot see or follow you inside. You start with 3 EMP pulses (<b>R</b> / EMP) that paralyse nearby sentinels — more EMP cells lie in the lab rooms and EMP labs.</p>
+          <p class="hint muted">The compass (top right) points the way: the orange marker aims at the keycard room, then the exit — straight-line direction only, you still have to find the path. Radar blips show where sentinels were at the last sweep.</p>
+          <p class="hint muted">Sentinels hear your footsteps and search where they last saw you. When one spots you, it radios the others: they all converge, like ghosts in a maze.</p>
           <p class="hint muted">Sealed rooms line every corridor: ARMORY doors hide hammers and grenades, EMP LAB doors a robot nullifier that paralyses sentinels for a few seconds.</p>
           <p class="hint muted">Each wing's exit is locked. Find the keycard in its SECURITY room, then push on into the next wing.</p>
         </div>

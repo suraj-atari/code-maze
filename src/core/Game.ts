@@ -13,9 +13,11 @@ import type { DebugSystem } from '../debug/DebugSystem';
 import { EffectsManager } from '../effects/EffectsManager';
 import { ParticleSystem } from '../effects/ParticleSystem';
 import { InputManager } from '../input/InputManager';
+import { IntroCinematic } from '../intro/IntroCinematic';
 import { LevelManager } from '../level/LevelManager';
 import { LampLight } from '../lighting/LampLight';
 import { LightingSystem } from '../lighting/LightingSystem';
+import { Maze } from '../maze/Maze';
 import { PhysicsSystem } from '../physics/PhysicsSystem';
 import { FirstPersonCamera, type CameraRigInput } from '../player/FirstPersonCamera';
 import { Lamp } from '../player/Lamp';
@@ -27,6 +29,7 @@ import { ObjectPoolManager } from '../pooling/ObjectPoolManager';
 import { SceneManager } from '../rendering/SceneManager';
 import { RobotManager } from '../robots/RobotManager';
 import { RobotModelFactory } from '../robots/RobotModelFactory';
+import { MAX_BLIPS } from '../ui/Compass';
 import { createHudModel } from '../ui/Hud';
 import { UIManager, type RunSummary, type UICommands } from '../ui/UIManager';
 import { clamp } from '../utils/math';
@@ -61,6 +64,11 @@ interface GameWorld {
   readonly levels: LevelManager;
   readonly tutorial: TutorialDirector;
 }
+
+/** Seconds between radar pings: blips show where robots were at the last ping. */
+const RADAR_PING = 1.4;
+/** Blips are smeared by up to this many metres: the radar says where a robot *might* be. */
+const RADAR_JITTER = 1.2;
 
 const nextFrame = (): Promise<void> => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -117,6 +125,13 @@ export class Game implements UICommands {
   private viewMode: ViewMode = loadViewMode();
   private debugArmoryIndex = 0;
   private renderPending = false;
+  /** Seed of the next run, chosen early so the menu can show its map. */
+  private previewSeed = this.newSeed();
+  private readonly intro: IntroCinematic;
+  private radarTimer = RADAR_PING;
+  private radarCount = 0;
+  private readonly radarWorld = new Float32Array(MAX_BLIPS * 2);
+  private readonly radarKind = new Uint8Array(MAX_BLIPS);
 
   constructor(
     private readonly config: GameConfig,
@@ -132,6 +147,10 @@ export class Game implements UICommands {
     this.ui.showState(GameState.Loading);
 
     this.sceneManager = new SceneManager(container, this.quality, config.graphics.fovDeg);
+    this.intro = new IntroCinematic(this.sceneManager.scene, this.sceneManager.camera);
+    this.ui.onDifficultyChange = () => {
+      if (this.states.is(GameState.MainMenu)) this.refreshMapPreview();
+    };
     this.input = new InputManager(
       this.sceneManager.canvas,
       document.getElementById('touch-controls'),
@@ -143,6 +162,8 @@ export class Game implements UICommands {
     };
     this.sceneManager.canvas.addEventListener('click', () => {
       if (this.states.is(GameState.Playing)) this.input.requestPointerLock();
+      // With the pointer locked, clicks reach the canvas instead of the intro overlay.
+      else if (this.states.is(GameState.Intro)) this.skipIntro();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
@@ -220,6 +241,7 @@ export class Game implements UICommands {
       textures: {
         wall: assets.requireTexture(TextureKeys.Wall),
         wallEmissive: assets.requireTexture(TextureKeys.WallEmissive),
+        wallGlass: assets.requireTexture(TextureKeys.WallGlass),
         floor: assets.requireTexture(TextureKeys.Floor),
         ceiling: assets.requireTexture(TextureKeys.Ceiling),
         ceilingEmissive: assets.requireTexture(TextureKeys.CeilingEmissive),
@@ -232,6 +254,7 @@ export class Game implements UICommands {
       armory,
       weapons,
       events: this.events,
+      labRoomNullifierShare: cfg.armory.labRoomNullifierShare,
     });
 
     const tutorial = new TutorialDirector({
@@ -291,9 +314,11 @@ export class Game implements UICommands {
     this.tutorialMode = false;
     this.difficulty = findDifficulty(this.config, difficultyId);
     this.levelIndex = 0;
-    this.levelSeed = this.runSeed = this.newSeed();
+    // The run plays the map the menu was showing.
+    this.levelSeed = this.runSeed = this.previewSeed;
+    this.previewSeed = this.newSeed();
     this.runTime = 0;
-    this.loadLevelAndPlay();
+    this.loadLevelAndPlay(true);
   }
 
   startTutorial(): void {
@@ -324,9 +349,14 @@ export class Game implements UICommands {
     this.loadLevelAndPlay();
   }
 
+  skipIntro(): void {
+    this.intro.skip();
+  }
+
   quitToMenu(): void {
     const w = this.world;
     if (!w) return;
+    this.intro.end();
     w.tutorial.stop();
     w.levels.unload();
     w.gameAudio.stopLevel();
@@ -341,15 +371,65 @@ export class Game implements UICommands {
     if (this.states.is(GameState.Playing)) this.states.transition(GameState.Paused);
   }
 
-  private loadLevelAndPlay(): void {
+  /** @param withIntro play the 2D map → 3D intro first (new runs only) */
+  private loadLevelAndPlay(withIntro = false): void {
     const w = this.world;
     if (!w) return;
     w.audio.unlock();
     w.tutorial.stop();
     this.advancePending = false;
     this.loadWing(w, false);
-    this.enterPlaying();
+    if (withIntro && !this.tutorialMode) this.enterIntro(w);
+    else this.enterPlaying();
     if (this.tutorialMode) w.tutorial.start();
+  }
+
+  /**
+   * Plays the 2D map → 3D intro on the current wing. From a menu click (a user gesture) it also
+   * takes the pointer lock for the whole intro; between wings the lock is already held.
+   */
+  private enterIntro(w: GameWorld, betweenWings = false): void {
+    const level = w.levels.current;
+    if (!level) {
+      this.enterPlaying();
+      return;
+    }
+    if (!betweenWings) {
+      if (this.device.touch) enterImmersiveMode();
+      else this.input.requestPointerLock();
+    }
+    this.ui.intro.setText(
+      betweenWings ? `WING ${this.levelIndex + 1}` : null,
+      betweenWings ? 'A bigger lab, and the sentinels are faster. Find the keycard, then the EXIT.' : null,
+    );
+    // The intro lands exactly on the gameplay camera.
+    if (this.viewMode === 'third') w.avatar.update(0, 0, w.player, false);
+    this.syncCamera(w, 1);
+    const cam = this.sceneManager.camera;
+    this.intro.begin(level.maze.data, this.config.maze.wallHeight, cam.position, cam.quaternion);
+    this.states.transition(GameState.Intro);
+  }
+
+  private updateIntro(w: GameWorld, dt: number, time: number): void {
+    // Drain input so nothing pressed during the intro fires on the first gameplay frame.
+    this.input.poll();
+    const running = this.intro.update(dt);
+    w.levels.current?.exit.update(time);
+    w.lighting.update(dt);
+    this.ui.intro.update(this.intro.overlay);
+    this.sceneManager.render();
+    if (running) return;
+    this.intro.end();
+    this.syncCamera(w, 1);
+    this.input.flush();
+    this.states.transition(GameState.Playing);
+  }
+
+  private refreshMapPreview(): void {
+    const difficulty = findDifficulty(this.config, this.ui.selectedDifficultyId);
+    const level = resolveLevelConfig(this.config, difficulty, 0, this.previewSeed);
+    // Same generator, rooms and seed as LevelManager.load → the exact map of the next run.
+    this.ui.showMapPreview(Maze.generate(level.mazeRooms, level.maze, new Random(level.seed)));
   }
 
   /** Builds the current wing (or the training course). */
@@ -361,6 +441,8 @@ export class Game implements UICommands {
     const level = w.levels.load(levelConfig, carryOver);
     w.fpCamera.reset();
     w.tpCamera.reset();
+    this.radarCount = 0;
+    this.radarTimer = RADAR_PING;
     w.effects.setExit(level.exit.position.x, level.exit.position.z);
     w.gameAudio.startLevel(level.exit.position);
     this.hud.levelLabel = this.tutorialMode
@@ -370,8 +452,8 @@ export class Game implements UICommands {
   }
 
   /**
-   * Walks straight through the exit into the next wing: bigger, with more sentinels. No
-   * "level complete" screen; supplies carry over.
+   * Walks straight through the exit into the next wing: bigger, with more and faster
+   * sentinels, introduced by the map intro. No "level complete" screen; supplies carry over.
    */
   private advanceWing(w: GameWorld): void {
     this.advancePending = false;
@@ -379,6 +461,8 @@ export class Game implements UICommands {
     this.levelIndex++;
     this.levelSeed = this.newSeed();
     this.loadWing(w, true);
+    // The new wing opens like the run did: its map, then the dive into the maze.
+    this.enterIntro(w, true);
   }
 
   /** Must run inside a user gesture (button click) for pointer lock / fullscreen. */
@@ -423,8 +507,9 @@ export class Game implements UICommands {
   private readonly onStateChange = (next: GameState): void => {
     this.ui.showState(next);
     this.input.setTouchControlsVisible(next === GameState.Playing);
+    if (next === GameState.MainMenu) this.refreshMapPreview();
     const w = this.world;
-    if (next === GameState.Playing) {
+    if (next === GameState.Playing || next === GameState.Intro) {
       w?.audio.resume();
     } else {
       this.input.releasePointerLock();
@@ -472,6 +557,8 @@ export class Game implements UICommands {
     if (!w) return;
     if (this.states.is(GameState.Playing)) {
       this.updatePlaying(w, dt, time);
+    } else if (this.states.is(GameState.Intro)) {
+      this.updateIntro(w, dt, time);
     } else if (this.renderPending) {
       this.renderPending = false;
       this.sceneManager.render();
@@ -480,7 +567,10 @@ export class Game implements UICommands {
   };
 
   private updatePlaying(w: GameWorld, dt: number, time: number): void {
-    if (this.advancePending) this.advanceWing(w);
+    if (this.advancePending) {
+      this.advanceWing(w);
+      return;
+    }
     const input = this.input.poll();
     if (input.pausePressed) {
       this.pause();
@@ -493,7 +583,7 @@ export class Game implements UICommands {
       if (input.interactPressed || input.attackPressed) w.tutorial.continue();
       w.tutorial.updateFrozen(dt);
       this.syncCamera(w, dt);
-      this.updateHud(w, 0);
+      this.updateHud(w, 0, 0);
       this.sceneManager.render();
       return;
     }
@@ -520,7 +610,7 @@ export class Game implements UICommands {
     w.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.forward.x, this.forward.y, this.forward.z);
     w.gameAudio.update(dt, w.robots.robots, threat);
 
-    this.updateHud(w, threat);
+    this.updateHud(w, threat, dt);
     this.sceneManager.render();
   }
 
@@ -551,8 +641,9 @@ export class Game implements UICommands {
     return robots.maxSuspicion * 0.5;
   }
 
-  private updateHud(w: GameWorld, threat: number): void {
+  private updateHud(w: GameWorld, threat: number, dt: number): void {
     const h = this.hud;
+    this.updateCompass(w, dt);
     const player = w.player;
     h.elapsed = (this.tutorialMode ? 0 : this.runTime) + (w.levels.current?.elapsed ?? 0);
     h.battery = player.lamp.batteryFraction;
@@ -577,6 +668,67 @@ export class Game implements UICommands {
             : `${use} TO ENTER THE NEXT WING`
         : null;
     this.ui.updateHud(h);
+  }
+
+  /**
+   * Compass radar: heading, the straight-line bearing to the current goal (the keycard room
+   * while the exit is locked, then the exit) and robot blips from periodic, slightly smeared pings.
+   */
+  private updateCompass(w: GameWorld, dt: number): void {
+    const c = this.hud.compass;
+    const level = w.levels.current;
+    if (!level) return;
+    const p = w.player.position;
+    const yaw = w.player.yaw;
+    // Compass bearings: clockwise from north (world -Z); the player looks along (-sin yaw, -cos yaw).
+    c.heading = -yaw;
+
+    let tx = level.exit.position.x;
+    let tz = level.exit.position.z;
+    c.targetLabel = 'EXIT';
+    if (level.exitLocked) {
+      const room = w.armory.armories.find((a) => a.loot === 'keycard' && !a.looted);
+      if (room) {
+        tx = room.cacheX;
+        tz = room.cacheZ;
+        c.targetLabel = 'KEYCARD';
+      }
+    }
+    const dx = tx - p.x;
+    const dz = tz - p.z;
+    c.targetBearing = Math.atan2(dx, -dz);
+    c.targetDistance = Math.hypot(dx, dz);
+
+    this.radarTimer += dt;
+    if (this.radarTimer >= RADAR_PING) {
+      this.radarTimer = 0;
+      let n = 0;
+      const reach = c.range * 1.2;
+      for (const r of w.robots.active) {
+        if (n >= MAX_BLIPS) break;
+        const rp = r.position;
+        if (Math.abs(rp.x - p.x) > reach || Math.abs(rp.z - p.z) > reach) continue;
+        this.radarWorld[n * 2] = rp.x + (Math.random() * 2 - 1) * RADAR_JITTER;
+        this.radarWorld[n * 2 + 1] = rp.z + (Math.random() * 2 - 1) * RADAR_JITTER;
+        this.radarKind[n] = r.stunned ? 2 : r.stateId === 'chase' || r.stateId === 'investigate' ? 1 : 0;
+        n++;
+      }
+      this.radarCount = n;
+    }
+    c.sweep = this.radarTimer / RADAR_PING;
+    const alpha = 1 - 0.75 * c.sweep;
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    c.blipCount = this.radarCount;
+    for (let i = 0; i < this.radarCount; i++) {
+      // Into the player's frame: x along right (cos, -sin), y along forward (-sin, -cos).
+      const bx = this.radarWorld[i * 2]! - p.x;
+      const bz = this.radarWorld[i * 2 + 1]! - p.z;
+      c.blips[i * 2] = bx * cos - bz * sin;
+      c.blips[i * 2 + 1] = -bx * sin - bz * cos;
+      c.blipAlpha[i] = alpha;
+      c.blipKind[i] = this.radarKind[i]!;
+    }
   }
 
   private async startDebug(w: GameWorld): Promise<void> {

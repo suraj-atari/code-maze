@@ -1,3 +1,5 @@
+import { Compass, createCompassModel, type CompassModel } from './Compass';
+
 /** Plain data the game hands to the HUD each frame (the object is reused by the producer). */
 export interface HudModel {
   levelLabel: string;
@@ -18,6 +20,7 @@ export interface HudModel {
   nullifiers: number;
   /** Exit keycard: 'none' when this area has no locked exit. */
   keycard: 'none' | 'missing' | 'found';
+  readonly compass: CompassModel;
 }
 
 export function createHudModel(): HudModel {
@@ -35,6 +38,7 @@ export function createHudModel(): HudModel {
     hammerHits: 0,
     nullifiers: 0,
     keycard: 'none',
+    compass: createCompassModel(),
   };
 }
 
@@ -65,6 +69,7 @@ export class Hud {
   private readonly grenades = el('hud-grenades');
   private readonly nullifiers = el('hud-nullifiers');
   private readonly keycard = el('hud-keycard');
+  private readonly compass = new Compass(el('hud-compass'));
 
   private last = {
     level: '',
@@ -181,6 +186,8 @@ export class Hud {
       this.keycard.classList.toggle('empty', m.keycard === 'missing');
       this.keycard.textContent = m.keycard === 'found' ? 'KEYCARD ✓' : 'KEYCARD —';
     }
+
+    this.compass.update(m.compass);
 
     const threat = Math.round(m.threat * 20);
     if (threat !== l.threat) {
