@@ -84,6 +84,11 @@ export class UIManager {
     this.intro.setVisible(state === GameState.Intro);
   }
 
+  /** Touch: the full button set (tutorial) or the streamlined one (normal runs). */
+  setTouchLayout(classic: boolean): void {
+    document.body.classList.toggle('touch-classic', classic);
+  }
+
   get selectedDifficultyId(): string {
     return this.selectedDifficulty;
   }

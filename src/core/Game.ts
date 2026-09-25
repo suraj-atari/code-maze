@@ -148,6 +148,7 @@ export class Game implements UICommands {
 
     this.sceneManager = new SceneManager(container, this.quality, config.graphics.fovDeg);
     this.intro = new IntroCinematic(this.sceneManager.scene, this.sceneManager.camera);
+    this.intro.timeScale = this.device.touch ? 1.6 : 1;
     this.ui.onDifficultyChange = () => {
       if (this.states.is(GameState.MainMenu)) this.refreshMapPreview();
     };
@@ -157,6 +158,11 @@ export class Game implements UICommands {
       config.player,
       this.device,
     );
+    // Phones: touching the stick or the look area during the intro skips it, and that same
+    // touch keeps steering once play starts (no extra tap needed).
+    this.input.onTouchActivity = () => {
+      if (this.states.is(GameState.Intro)) this.skipIntro();
+    };
     this.input.onPointerLockChange = (locked) => {
       if (!locked && this.states.is(GameState.Playing)) this.pause();
     };
@@ -435,6 +441,7 @@ export class Game implements UICommands {
   /** Builds the current wing (or the training course). */
   private loadWing(w: GameWorld, carryOver: boolean): void {
     w.effects.clear();
+    this.ui.setTouchLayout(this.tutorialMode);
     const levelConfig = this.tutorialMode
       ? tutorialLevelConfig(this.config)
       : resolveLevelConfig(this.config, this.difficulty, this.levelIndex, this.levelSeed);
@@ -506,7 +513,7 @@ export class Game implements UICommands {
 
   private readonly onStateChange = (next: GameState): void => {
     this.ui.showState(next);
-    this.input.setTouchControlsVisible(next === GameState.Playing);
+    this.input.setTouchControlsVisible(next === GameState.Playing || next === GameState.Intro);
     if (next === GameState.MainMenu) this.refreshMapPreview();
     const w = this.world;
     if (next === GameState.Playing || next === GameState.Intro) {
@@ -657,6 +664,7 @@ export class Game implements UICommands {
     h.nullifiers = w.weapons.nullifiers;
     const level = w.levels.current;
     h.keycard = !level?.keycardRequired ? 'none' : level.hasKeycard ? 'found' : 'missing';
+    this.updateTouchAction(w);
     const use = this.device.touch ? 'TAP USE' : 'PRESS E';
     h.prompt = w.armory.promptVisible
       ? `${use} TO OPEN ${ROOM_LABELS[w.armory.promptKind].text}`
@@ -667,7 +675,35 @@ export class Game implements UICommands {
             ? `${use} TO ESCAPE`
             : `${use} TO ENTER THE NEXT WING`
         : null;
+    // Touch: the context button replaces the "press to…" line whenever it offers the action.
+    if (h.action && !this.tutorialMode) h.prompt = null;
     this.ui.updateHud(h);
+  }
+
+  /**
+   * Touch context button (middle of the screen): smash a robot within hammer reach, open the
+   * door in front of you, or walk through an unlocked exit. Hidden when nothing applies.
+   */
+  private updateTouchAction(w: GameWorld): void {
+    const h = this.hud;
+    h.action = null;
+    h.actionMode = 'interact';
+    if (!this.device.touch || this.tutorialMode) return;
+    if (w.weapons.hammerHits > 0) {
+      const p = w.player.position;
+      const reach = this.config.weapons.hammer.reach;
+      for (const r of w.robots.active) {
+        if (r.stunned) continue;
+        if (Math.hypot(r.position.x - p.x, r.position.z - p.z) <= reach) {
+          h.action = 'SMASH';
+          h.actionMode = 'attack';
+          return;
+        }
+      }
+    }
+    const level = w.levels.current;
+    if (w.armory.promptVisible) h.action = `OPEN ${ROOM_LABELS[w.armory.promptKind].text}`;
+    else if (w.levels.exitPromptVisible && level && !level.exitLocked) h.action = 'ESCAPE';
   }
 
   /**

@@ -21,6 +21,10 @@ export interface HudModel {
   /** Exit keycard: 'none' when this area has no locked exit. */
   keycard: 'none' | 'missing' | 'found';
   readonly compass: CompassModel;
+  /** Touch: label of the context button in the middle of the screen, or null to hide it. */
+  action: string | null;
+  /** What the context button does. */
+  actionMode: 'interact' | 'attack';
 }
 
 export function createHudModel(): HudModel {
@@ -39,6 +43,8 @@ export function createHudModel(): HudModel {
     nullifiers: 0,
     keycard: 'none',
     compass: createCompassModel(),
+    action: null,
+    actionMode: 'interact',
   };
 }
 
@@ -70,6 +76,10 @@ export class Hud {
   private readonly nullifiers = el('hud-nullifiers');
   private readonly keycard = el('hud-keycard');
   private readonly compass = new Compass(el('hud-compass'));
+  // Touch-only controls (always in the DOM; CSS shows them only in the streamlined mobile layout).
+  private readonly context = document.getElementById('touch-context');
+  private readonly empCount = document.getElementById('touch-emp-count');
+  private readonly empButton = this.empCount?.closest('button') ?? null;
 
   private last = {
     level: '',
@@ -87,6 +97,8 @@ export class Hud {
     hammerHits: -1,
     nullifiers: -1,
     keycard: '',
+    action: '' as string | null,
+    actionMode: '',
   };
   private toastTimer = 0;
 
@@ -179,6 +191,16 @@ export class Hud {
       l.nullifiers = m.nullifiers;
       this.nullifiers.textContent = `NULLIFIER ×${m.nullifiers}`;
       this.nullifiers.classList.toggle('empty', m.nullifiers === 0);
+      if (this.empCount) this.empCount.textContent = String(m.nullifiers);
+      this.empButton?.classList.toggle('empty', m.nullifiers === 0);
+    }
+    if (this.context && (m.action !== l.action || m.actionMode !== l.actionMode)) {
+      l.action = m.action;
+      l.actionMode = m.actionMode;
+      this.context.classList.toggle('hidden', m.action === null);
+      if (m.action) this.context.textContent = m.action;
+      this.context.dataset['mode'] = m.actionMode;
+      this.context.classList.toggle('attack', m.actionMode === 'attack');
     }
     if (m.keycard !== l.keycard) {
       l.keycard = m.keycard;

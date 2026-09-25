@@ -26,7 +26,7 @@
         <div class="look-zone"></div>
         <div class="joystick-zone">
           <div class="joystick-base"><div class="joystick-knob"></div></div>
-          <span class="joystick-hint">MOVE</span>
+          <span class="joystick-hint">MOVE · PUSH TO THE EDGE TO SPRINT</span>
         </div>
         <div class="touch-buttons">
           <button class="touch-btn" data-action="crouch">SNEAK</button>
@@ -37,6 +37,10 @@
           <button class="touch-btn touch-btn-attack" data-action="throw">THROW</button>
           <button class="touch-btn touch-btn-emp" data-action="nullify">EMP</button>
         </div>
+        <!-- Streamlined layout (normal runs): one EMP button and a context button that appears
+             in the middle of the screen only when there is something to do. -->
+        <button class="touch-emp" data-action="nullify" aria-label="EMP pulse"><span>EMP</span><b id="touch-emp-count">0</b></button>
+        <button id="touch-context" class="touch-context hidden" data-action="context" data-mode="interact">USE</button>
         <button class="touch-view" data-action="view" aria-label="Switch first/third-person view">VIEW</button>
         <button class="touch-pause" data-action="pause" aria-label="Pause">❚❚</button>
       </div>
@@ -130,8 +134,8 @@
             <span><b>C</b> sneak</span><span><b>F / RMB</b> lamp</span><span><b>E</b> use</span><span><b>LMB / Q</b> hammer</span><span><b>G</b> grenade</span><span><b>R</b> nullifier</span><span><b>V</b> 1st/3rd person</span><span><b>Esc</b> pause</span>
           </div>
           <div class="controls-help touch-only">
-            <span><b>Left thumb</b> move (push lightly to sneak)</span><span><b>Right thumb</b> look</span>
-            <span><b>LAMP · RUN · SNEAK · USE · SMASH · THROW · EMP</b> buttons</span><span><b>VIEW</b> 1st/3rd person</span>
+            <span><b>Left thumb</b> move (light push = quiet, push to the edge = sprint)</span><span><b>Right thumb</b> look</span>
+            <span><b>EMP</b> button · action button appears when you can open a door or smash a robot</span><span><b>VIEW</b> 1st/3rd person</span>
           </div>
           <p class="hint muted">Lamp on: you see further — so do they. Running is loud.</p>
           <p class="hint muted">You always move at a run — hold <b>Shift</b> for a burst. Doors you can open glow yellow. Every wing is bigger and its sentinels faster.</p>

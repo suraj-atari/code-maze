@@ -2,12 +2,16 @@ import type { InputSource, InputState } from './InputState';
 
 const JOYSTICK_RADIUS = 60;
 const DEAD_ZONE = 0.12;
+/** Pushing the stick past this deflection sprints (no separate RUN button needed). */
+const SPRINT_DEFLECTION = 0.9;
 
 /**
  * Mobile controls built on Pointer Events (multi-touch safe via pointerId):
- *  - floating virtual joystick on the left half (partial deflection = sneaking speed)
+ *  - floating virtual joystick on the left half (light push = quiet, push to the rim = sprint)
  *  - swipe-to-look on the right half
- *  - LAMP / USE / SMASH / THROW buttons (one-shot), RUN / SNEAK toggles, VIEW and pause buttons.
+ *  - streamlined layout: EMP button + a context button (use a door / smash a robot) that the HUD
+ *    shows only when it applies; the tutorial uses the full LAMP / USE / SMASH / THROW / RUN /
+ *    SNEAK set, since it teaches each of them. VIEW and pause buttons in both.
  * The DOM skeleton lives in index.html (#touch-controls); this class only wires it up.
  */
 export class TouchInput implements InputSource {
@@ -30,6 +34,10 @@ export class TouchInput implements InputSource {
   private lookY = 0;
 
   private sprintOn = false;
+  /** Sprinting because the stick is pushed to the rim. */
+  private stickSprint = false;
+  /** Called on the first touch of the stick or look area (e.g. to skip the intro). */
+  onActivity: (() => void) | null = null;
   private crouchOn = false;
   private lamp = false;
   private interact = false;
@@ -70,7 +78,7 @@ export class TouchInput implements InputSource {
     state.moveY += this.moveY;
     state.lookX += this.lookX;
     state.lookY += this.lookY;
-    state.sprint ||= this.sprintOn;
+    state.sprint ||= this.sprintOn || this.stickSprint;
     state.crouch ||= this.crouchOn;
     state.lampPressed ||= this.lamp;
     state.interactPressed ||= this.interact;
@@ -106,6 +114,7 @@ export class TouchInput implements InputSource {
     this.base.style.top = `${e.clientY - rect.top}px`;
     this.base.classList.add('active');
     this.updateStick(e.clientX, e.clientY);
+    this.onActivity?.();
   };
 
   private readonly onJoyMove = (e: PointerEvent): void => {
@@ -128,6 +137,11 @@ export class TouchInput implements InputSource {
     }
     this.knob.style.transform = `translate(${dx * JOYSTICK_RADIUS}px, ${dy * JOYSTICK_RADIUS}px)`;
     const mag = Math.min(1, len);
+    const sprint = mag >= SPRINT_DEFLECTION;
+    if (sprint !== this.stickSprint) {
+      this.stickSprint = sprint;
+      this.base.classList.toggle('sprinting', sprint);
+    }
     if (mag < DEAD_ZONE) {
       this.moveX = this.moveY = 0;
       return;
@@ -142,7 +156,8 @@ export class TouchInput implements InputSource {
     this.joyPointer = -1;
     this.moveX = this.moveY = 0;
     this.knob.style.transform = 'translate(0px, 0px)';
-    this.base.classList.remove('active');
+    this.base.classList.remove('active', 'sprinting');
+    this.stickSprint = false;
     // Sprint is a toggle that auto-cancels when the player lets go of the stick.
     this.setSprint(false);
   }
@@ -154,6 +169,7 @@ export class TouchInput implements InputSource {
     this.lookZone.setPointerCapture(e.pointerId);
     this.lastLookX = e.clientX;
     this.lastLookY = e.clientY;
+    this.onActivity?.();
   };
 
   private readonly onLookMove = (e: PointerEvent): void => {
@@ -190,6 +206,11 @@ export class TouchInput implements InputSource {
         break;
       case 'nullify':
         this.nullify = true;
+        break;
+      case 'context':
+        // The HUD sets the mode to what the button currently offers.
+        if ((e.currentTarget as HTMLElement).dataset['mode'] === 'attack') this.attack = true;
+        else this.interact = true;
         break;
       case 'view':
         this.view = true;

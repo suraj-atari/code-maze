@@ -36,6 +36,11 @@ export class InputManager {
     this.keyboardMouse.exitPointerLock();
   }
 
+  /** Called on the first touch of the joystick or look area. */
+  set onTouchActivity(cb: (() => void) | null) {
+    if (this.touch) this.touch.onActivity = cb;
+  }
+
   setTouchControlsVisible(visible: boolean): void {
     this.touch?.setVisible(visible);
   }

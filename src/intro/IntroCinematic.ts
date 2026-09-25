@@ -112,6 +112,8 @@ export class IntroCinematic {
 
   private time = 0;
   private running = false;
+  /** Playback speed (phones play it faster: they want to get going). */
+  timeScale = 1;
   private readonly flattened: Object3D[] = [];
   private readonly flattenedScale: number[] = [];
   private wallHeight = 3;
@@ -220,7 +222,7 @@ export class IntroCinematic {
   /** @returns false once the intro has finished */
   update(dt: number): boolean {
     if (!this.running) return false;
-    this.time += dt;
+    this.time += dt * this.timeScale;
     this.apply();
     return this.time < ZOOM_END;
   }
