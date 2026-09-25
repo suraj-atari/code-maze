@@ -16,6 +16,8 @@ export interface MazeBuildParams {
   readonly config: MazeConfig;
   readonly textures: MazeTextures;
   readonly shadows: boolean;
+  /** See-through glass windows in the walls (off on phones: a second, transparent pass). */
+  readonly glassWindows: boolean;
   readonly physics: PhysicsSystem;
   readonly rng: Random;
 }
@@ -53,7 +55,7 @@ export class Maze {
     return new Maze(
       data,
       chambers,
-      new MazeRenderer(data, chambers, p.config, p.textures, p.shadows),
+      new MazeRenderer(data, chambers, p.config, p.textures, p.shadows, p.glassWindows),
       new MazePhysics(p.physics, data, chambers, p.config),
       new Pathfinder(data),
     );

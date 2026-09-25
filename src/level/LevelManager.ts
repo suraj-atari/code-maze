@@ -22,6 +22,7 @@ export interface LevelManagerDeps {
   readonly physics: PhysicsSystem;
   readonly textures: MazeTextures;
   readonly shadows: boolean;
+  readonly glassWindows: boolean;
   readonly player: Player;
   readonly lampLight: LampLight;
   readonly robots: RobotManager;
@@ -68,6 +69,7 @@ export class LevelManager {
       config: config.maze,
       textures: d.textures,
       shadows: d.shadows,
+      glassWindows: d.glassWindows,
       physics: d.physics,
       rng,
     });

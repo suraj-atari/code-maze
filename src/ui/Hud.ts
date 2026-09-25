@@ -75,7 +75,8 @@ export class Hud {
   private readonly grenades = el('hud-grenades');
   private readonly nullifiers = el('hud-nullifiers');
   private readonly keycard = el('hud-keycard');
-  private readonly compass = new Compass(el('hud-compass'));
+  // Phones redraw the compass at ~30 Hz: it is a 2D canvas and the difference is invisible.
+  private readonly compass = new Compass(el('hud-compass'), window.matchMedia('(pointer: coarse)').matches ? 1 / 30 : 0);
   // Touch-only controls (always in the DOM; CSS shows them only in the streamlined mobile layout).
   private readonly context = document.getElementById('touch-context');
   private readonly empCount = document.getElementById('touch-emp-count');

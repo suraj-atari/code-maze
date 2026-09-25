@@ -97,7 +97,12 @@ input.poll() → player.update() → level.update() (exit/interact) → robots.u
   typed-array BFS with visit stamps, stateless AI states.
 * AI perception runs at `sensorHz` (staggered), not every frame. Pathfinding only on state change / repath timer.
 * Constant light count per level (lights are dimmed, never added/removed) → no shader recompiles mid-game.
-* Mobile quality preset: capped pixel ratio, no shadows, no robot spot lights, fewer particles, equal-power panning.
+* Mobile quality preset: capped pixel ratio, no shadows, no robot spot lights, fewer particles, equal-power panning,
+  wall windows drawn opaque (no transparent glass pass), compass redrawn at ~30 Hz, and adaptive resolution
+  (`SceneManager.adapt`: slow frames lower the pixel ratio down to 0.7, headroom raises it back to the cap).
+* Touch stick/look use Touch Events tracked by identifier and re-validated against `TouchEvent.touches` on every
+  event, so a lost `touchend` can never leave the stick stuck.
+* HUD strings (prompts, compass label) are prebuilt or rebuilt only when their numbers change.
 
 ## Milestones
 

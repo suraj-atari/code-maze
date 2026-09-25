@@ -41,7 +41,8 @@ export function createCompassModel(): CompassModel {
 
 const TAU = Math.PI * 2;
 const TARGET = '#ffb02e';
-const BLIP_COLORS = ['255, 176, 46', '255, 48, 64', '166, 107, 255'] as const;
+/** Blip colours by kind; fading uses globalAlpha, so no colour strings are built per frame. */
+const BLIP_COLORS = ['rgb(255, 176, 46)', 'rgb(255, 48, 64)', 'rgb(166, 107, 255)'] as const;
 
 /**
  * Heading-up compass radar: the ring (N, ticks) turns with the player, whose arrow always
@@ -55,11 +56,17 @@ export class Compass {
   private readonly labelName: HTMLElement;
   private readonly labelValue: HTMLElement;
   private lastLabel = '';
-  private lastValue = '';
   private cssSize = 0;
   private font = '';
+  private lastDeg = -1;
+  private lastMeters = -1;
+  private lastDraw = 0;
 
-  constructor(root: HTMLElement) {
+  /** @param minInterval seconds between redraws (phones redraw at ~30 Hz) */
+  constructor(
+    root: HTMLElement,
+    private readonly minInterval = 0,
+  ) {
     this.canvas = root.querySelector('canvas')!;
     this.ctx = this.canvas.getContext('2d');
     this.labelName = root.querySelector('.compass-name')!;
@@ -69,6 +76,12 @@ export class Compass {
   update(m: Readonly<CompassModel>): void {
     const ctx = this.ctx;
     if (!ctx) return;
+    this.updateLabel(m);
+    if (this.minInterval > 0) {
+      const now = performance.now();
+      if (now - this.lastDraw < this.minInterval * 1000) return;
+      this.lastDraw = now;
+    }
     this.fit();
     const S = this.cssSize;
     const c = S / 2;
@@ -137,16 +150,17 @@ export class Compass {
       const x = m.blips[i * 2]! * scale;
       const y = m.blips[i * 2 + 1]! * scale;
       if (x * x + y * y > (R - 6) * (R - 6)) continue;
-      const rgb = BLIP_COLORS[m.blipKind[i]!] ?? BLIP_COLORS[0];
-      ctx.fillStyle = `rgba(${rgb}, ${(0.25 * alpha).toFixed(3)})`;
+      ctx.fillStyle = BLIP_COLORS[m.blipKind[i]!] ?? BLIP_COLORS[0];
+      ctx.globalAlpha = 0.25 * alpha;
       ctx.beginPath();
       ctx.arc(c + x, c - y, 7, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = `rgba(${rgb}, ${alpha.toFixed(3)})`;
+      ctx.globalAlpha = alpha;
       ctx.beginPath();
       ctx.arc(c + x, c - y, 3.2, 0, TAU);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
 
     // Goal direction: dashed line to a marker on the rim.
     const t = m.targetBearing - m.heading;
@@ -182,17 +196,20 @@ export class Compass {
     ctx.closePath();
     ctx.fill();
 
-    const deg = Math.round(((m.targetBearing * 180) / Math.PI + 360) % 360) % 360;
-    const value = `${String(deg).padStart(3, '0')}°`;
-    const text = `${value} · ${Math.round(m.targetDistance)} m`;
+  }
+
+  /** Bearing / distance text: rebuilt only when the rounded numbers change. */
+  private updateLabel(m: Readonly<CompassModel>): void {
     if (m.targetLabel !== this.lastLabel) {
       this.lastLabel = m.targetLabel;
       this.labelName.textContent = m.targetLabel;
     }
-    if (text !== this.lastValue) {
-      this.lastValue = text;
-      this.labelValue.innerHTML = `<b>${value}</b> · ${Math.round(m.targetDistance)} m`;
-    }
+    const deg = Math.round(((m.targetBearing * 180) / Math.PI + 360) % 360) % 360;
+    const meters = Math.round(m.targetDistance);
+    if (deg === this.lastDeg && meters === this.lastMeters) return;
+    this.lastDeg = deg;
+    this.lastMeters = meters;
+    this.labelValue.innerHTML = `<b>${String(deg).padStart(3, '0')}°</b> · ${meters} m`;
   }
 
   /** Keeps the backing store matched to the CSS size and pixel ratio. */

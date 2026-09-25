@@ -35,6 +35,7 @@ const TOP_FOV = 30;
 const INTRO_FAR = 1200;
 /** Wall tops fade from map green to the interior's dark metal. */
 const TOP_INSIDE = new Color(0x3b4744);
+const TOP_MAP = new Color(MAP_COLORS.wall);
 
 /** What the DOM overlay shows: labels in screen space (0..1) and fade levels. */
 export interface IntroOverlayModel {
@@ -236,7 +237,7 @@ export class IntroCinematic {
   end(): void {
     if (!this.running) return;
     this.running = false;
-    this.flattened.forEach((o, i) => (o.scale.y = this.flattenedScale[i]!));
+    for (let i = 0; i < this.flattened.length; i++) this.flattened[i]!.scale.y = this.flattenedScale[i]!;
     this.flattened.length = 0;
     this.flattenedScale.length = 0;
     const fog = this.scene.fog;
@@ -267,11 +268,11 @@ export class IntroCinematic {
     // Walls rise; the caps ride on top and darken, the sandy floor fades out.
     const grow = smooth(remap(e, 0.15, 0.7));
     const scale = FLAT_SCALE + (1 - FLAT_SCALE) * grow;
-    this.flattened.forEach((o, i) => (o.scale.y = this.flattenedScale[i]! * scale));
+    for (let i = 0; i < this.flattened.length; i++) this.flattened[i]!.scale.y = this.flattenedScale[i]! * scale;
     const top = this.wallHeight * scale;
     this.capsMesh.position.y = top + 0.01;
     this.mapMesh.position.y = top + 0.02;
-    this.capsMaterial.color.set(MAP_COLORS.wall).lerp(TOP_INSIDE, smooth(remap(e, 0.35, 0.75)));
+    this.capsMaterial.color.copy(TOP_MAP).lerp(TOP_INSIDE, smooth(remap(e, 0.35, 0.75)));
     const floorAlpha = 1 - smooth(remap(e, 0.35, 0.7));
     this.floorMaterial.opacity = floorAlpha;
     this.floorMesh.visible = floorAlpha > 0.002;

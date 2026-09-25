@@ -4,30 +4,38 @@ const JOYSTICK_RADIUS = 60;
 const DEAD_ZONE = 0.12;
 /** Pushing the stick past this deflection sprints (no separate RUN button needed). */
 const SPRINT_DEFLECTION = 0.9;
+/** Touches starting left of this fraction of the screen width drive the stick; the rest look. */
+const STICK_SIDE = 0.45;
+const NO_TOUCH = -1;
 
 /**
- * Mobile controls built on Pointer Events (multi-touch safe via pointerId):
- *  - floating virtual joystick on the left half (light push = quiet, push to the rim = sprint)
- *  - swipe-to-look on the right half
+ * Mobile controls:
+ *  - floating virtual joystick on the left side (light push = quiet, push to the rim = sprint)
+ *  - swipe-to-look on the right side
  *  - streamlined layout: EMP button + a context button (use a door / smash a robot) that the HUD
  *    shows only when it applies; the tutorial uses the full LAMP / USE / SMASH / THROW / RUN /
  *    SNEAK set, since it teaches each of them. VIEW and pause buttons in both.
+ *
+ * Stick and look use Touch Events on the whole control layer, tracked by touch identifier.
+ * Every touch event re-checks the tracked touches against the fingers actually on the screen
+ * (`TouchEvent.touches`), so a lost `touchend` (system gesture, notification, a UI change under
+ * the finger) can never leave the stick "held" and ignoring new touches.
+ * Buttons use Pointer Events and are skipped by the stick/look tracking.
  * The DOM skeleton lives in index.html (#touch-controls); this class only wires it up.
  */
 export class TouchInput implements InputSource {
   private readonly joyZone: HTMLElement;
-  private readonly lookZone: HTMLElement;
   private readonly base: HTMLElement;
   private readonly knob: HTMLElement;
   private readonly buttons: HTMLElement[];
 
-  private joyPointer = -1;
+  private joyId = NO_TOUCH;
   private joyOriginX = 0;
   private joyOriginY = 0;
   private moveX = 0;
   private moveY = 0;
 
-  private lookPointer = -1;
+  private lookId = NO_TOUCH;
   private lastLookX = 0;
   private lastLookY = 0;
   private lookX = 0;
@@ -36,8 +44,6 @@ export class TouchInput implements InputSource {
   private sprintOn = false;
   /** Sprinting because the stick is pushed to the rim. */
   private stickSprint = false;
-  /** Called on the first touch of the stick or look area (e.g. to skip the intro). */
-  onActivity: (() => void) | null = null;
   private crouchOn = false;
   private lamp = false;
   private interact = false;
@@ -46,26 +52,26 @@ export class TouchInput implements InputSource {
   private throwGrenade = false;
   private nullify = false;
   private view = false;
+  /** Called on the first touch of the stick or look area (e.g. to skip the intro). */
+  onActivity: (() => void) | null = null;
 
   constructor(
     private readonly root: HTMLElement,
     private readonly sensitivity: number,
   ) {
     this.joyZone = this.q('.joystick-zone');
-    this.lookZone = this.q('.look-zone');
     this.base = this.q('.joystick-base');
     this.knob = this.q('.joystick-knob');
     this.buttons = Array.from(root.querySelectorAll<HTMLElement>('[data-action]'));
 
-    this.joyZone.addEventListener('pointerdown', this.onJoyDown);
-    this.joyZone.addEventListener('pointermove', this.onJoyMove);
-    this.joyZone.addEventListener('pointerup', this.onJoyUp);
-    this.joyZone.addEventListener('pointercancel', this.onJoyUp);
-    this.lookZone.addEventListener('pointerdown', this.onLookDown);
-    this.lookZone.addEventListener('pointermove', this.onLookMove);
-    this.lookZone.addEventListener('pointerup', this.onLookUp);
-    this.lookZone.addEventListener('pointercancel', this.onLookUp);
+    // Non-passive so preventDefault() stops scrolling / zooming / the 300 ms click delay.
+    const opts: AddEventListenerOptions = { passive: false };
+    root.addEventListener('touchstart', this.onTouchStart, opts);
+    root.addEventListener('touchmove', this.onTouchMove, opts);
+    root.addEventListener('touchend', this.onTouchEnd, opts);
+    root.addEventListener('touchcancel', this.onTouchEnd, opts);
     for (const b of this.buttons) b.addEventListener('pointerdown', this.onButton);
+    window.addEventListener('blur', this.onBlur);
   }
 
   setVisible(visible: boolean): void {
@@ -102,29 +108,72 @@ export class TouchInput implements InputSource {
     return el;
   }
 
-  private readonly onJoyDown = (e: PointerEvent): void => {
-    if (this.joyPointer !== -1) return;
-    e.preventDefault();
-    this.joyPointer = e.pointerId;
-    this.joyZone.setPointerCapture(e.pointerId);
-    this.joyOriginX = e.clientX;
-    this.joyOriginY = e.clientY;
-    const rect = this.joyZone.getBoundingClientRect();
-    this.base.style.left = `${e.clientX - rect.left}px`;
-    this.base.style.top = `${e.clientY - rect.top}px`;
-    this.base.classList.add('active');
-    this.updateStick(e.clientX, e.clientY);
-    this.onActivity?.();
+  // ---------------------------------------------------------------- stick + look (Touch Events)
+
+  private readonly onTouchStart = (e: TouchEvent): void => {
+    this.dropStaleTouches(e.touches);
+    let used = false;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i]!;
+      // Buttons handle their own touches.
+      if ((t.target as Element | null)?.closest?.('button')) continue;
+      if (t.clientX < window.innerWidth * STICK_SIDE) {
+        if (this.joyId !== NO_TOUCH) continue;
+        this.joyId = t.identifier;
+        this.joyOriginX = t.clientX;
+        this.joyOriginY = t.clientY;
+        const rect = this.joyZone.getBoundingClientRect();
+        this.base.style.left = `${t.clientX - rect.left}px`;
+        this.base.style.top = `${t.clientY - rect.top}px`;
+        this.base.classList.add('active');
+        this.updateStick(t.clientX, t.clientY);
+      } else {
+        if (this.lookId !== NO_TOUCH) continue;
+        this.lookId = t.identifier;
+        this.lastLookX = t.clientX;
+        this.lastLookY = t.clientY;
+      }
+      used = true;
+    }
+    if (used) {
+      e.preventDefault();
+      this.onActivity?.();
+    }
   };
 
-  private readonly onJoyMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.joyPointer) return;
-    this.updateStick(e.clientX, e.clientY);
+  private readonly onTouchMove = (e: TouchEvent): void => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i]!;
+      if (t.identifier === this.joyId) {
+        this.updateStick(t.clientX, t.clientY);
+      } else if (t.identifier === this.lookId) {
+        this.lookX += (t.clientX - this.lastLookX) * this.sensitivity;
+        this.lookY += (t.clientY - this.lastLookY) * this.sensitivity;
+        this.lastLookX = t.clientX;
+        this.lastLookY = t.clientY;
+      }
+    }
+    if (this.joyId !== NO_TOUCH || this.lookId !== NO_TOUCH) e.preventDefault();
   };
 
-  private readonly onJoyUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.joyPointer) return;
+  private readonly onTouchEnd = (e: TouchEvent): void => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const id = e.changedTouches[i]!.identifier;
+      if (id === this.joyId) this.resetStick();
+      else if (id === this.lookId) this.lookId = NO_TOUCH;
+    }
+    this.dropStaleTouches(e.touches);
+  };
+
+  /** Forgets tracked touches whose finger is no longer on the screen (a missed touchend). */
+  private dropStaleTouches(active: TouchList): void {
+    if (this.joyId !== NO_TOUCH && !hasTouch(active, this.joyId)) this.resetStick();
+    if (this.lookId !== NO_TOUCH && !hasTouch(active, this.lookId)) this.lookId = NO_TOUCH;
+  }
+
+  private readonly onBlur = (): void => {
     this.resetStick();
+    this.lookId = NO_TOUCH;
   };
 
   private updateStick(x: number, y: number): void {
@@ -135,7 +184,7 @@ export class TouchInput implements InputSource {
       dx /= len;
       dy /= len;
     }
-    this.knob.style.transform = `translate(${dx * JOYSTICK_RADIUS}px, ${dy * JOYSTICK_RADIUS}px)`;
+    this.knob.style.transform = `translate(${(dx * JOYSTICK_RADIUS) | 0}px, ${(dy * JOYSTICK_RADIUS) | 0}px)`;
     const mag = Math.min(1, len);
     const sprint = mag >= SPRINT_DEFLECTION;
     if (sprint !== this.stickSprint) {
@@ -153,7 +202,7 @@ export class TouchInput implements InputSource {
   }
 
   private resetStick(): void {
-    this.joyPointer = -1;
+    this.joyId = NO_TOUCH;
     this.moveX = this.moveY = 0;
     this.knob.style.transform = 'translate(0px, 0px)';
     this.base.classList.remove('active', 'sprinting');
@@ -162,27 +211,7 @@ export class TouchInput implements InputSource {
     this.setSprint(false);
   }
 
-  private readonly onLookDown = (e: PointerEvent): void => {
-    if (this.lookPointer !== -1) return;
-    e.preventDefault();
-    this.lookPointer = e.pointerId;
-    this.lookZone.setPointerCapture(e.pointerId);
-    this.lastLookX = e.clientX;
-    this.lastLookY = e.clientY;
-    this.onActivity?.();
-  };
-
-  private readonly onLookMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.lookPointer) return;
-    this.lookX += (e.clientX - this.lastLookX) * this.sensitivity;
-    this.lookY += (e.clientY - this.lastLookY) * this.sensitivity;
-    this.lastLookX = e.clientX;
-    this.lastLookY = e.clientY;
-  };
-
-  private readonly onLookUp = (e: PointerEvent): void => {
-    if (e.pointerId === this.lookPointer) this.lookPointer = -1;
-  };
+  // ---------------------------------------------------------------- buttons (Pointer Events)
 
   private readonly onButton = (e: PointerEvent): void => {
     e.preventDefault();
@@ -242,20 +271,22 @@ export class TouchInput implements InputSource {
 
   private resetSticks(): void {
     this.resetStick();
-    this.lookPointer = -1;
+    this.lookId = NO_TOUCH;
     this.setCrouch(false);
     this.flush();
   }
 
   dispose(): void {
-    this.joyZone.removeEventListener('pointerdown', this.onJoyDown);
-    this.joyZone.removeEventListener('pointermove', this.onJoyMove);
-    this.joyZone.removeEventListener('pointerup', this.onJoyUp);
-    this.joyZone.removeEventListener('pointercancel', this.onJoyUp);
-    this.lookZone.removeEventListener('pointerdown', this.onLookDown);
-    this.lookZone.removeEventListener('pointermove', this.onLookMove);
-    this.lookZone.removeEventListener('pointerup', this.onLookUp);
-    this.lookZone.removeEventListener('pointercancel', this.onLookUp);
+    this.root.removeEventListener('touchstart', this.onTouchStart);
+    this.root.removeEventListener('touchmove', this.onTouchMove);
+    this.root.removeEventListener('touchend', this.onTouchEnd);
+    this.root.removeEventListener('touchcancel', this.onTouchEnd);
     for (const b of this.buttons) b.removeEventListener('pointerdown', this.onButton);
+    window.removeEventListener('blur', this.onBlur);
   }
+}
+
+function hasTouch(list: TouchList, id: number): boolean {
+  for (let i = 0; i < list.length; i++) if (list[i]!.identifier === id) return true;
+  return false;
 }

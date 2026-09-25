@@ -1180,3 +1180,127 @@ body.touch .joystick-zone {
 body.touch .look-zone {
   inset: 0 0 0 45%;
 }
+
+/* ------------------------------------------------------------------ launch screen */
+
+.loading-screen {
+  padding: 0;
+  background: #05080b;
+  overflow: hidden;
+}
+
+.loading-bg {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(28px) brightness(0.32) saturate(1.2);
+}
+
+.loading-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 4vw, 56px);
+  width: 100%;
+  height: 100%;
+  padding: max(16px, var(--safe-t)) max(16px, var(--safe-r)) max(16px, var(--safe-b)) max(16px, var(--safe-l));
+}
+
+.loading-art img {
+  display: block;
+  height: min(88vh, 52vw);
+  width: auto;
+  aspect-ratio: 1;
+  border: 1px solid rgba(160, 220, 240, 0.35);
+  box-shadow: 0 0 60px rgba(255, 40, 50, 0.25), 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.loading-side {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 3vh, 28px);
+  width: min(430px, 40vw);
+}
+
+.loading-story p {
+  margin: 0 0 clamp(8px, 1.6vh, 14px);
+  font-size: clamp(13px, 1.5vw, 18px);
+  line-height: 1.5;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: story-in 0.9s ease-out forwards;
+  text-shadow: 0 2px 8px #000;
+}
+
+.loading-story p:nth-child(1) { animation-delay: 0.3s; }
+.loading-story p:nth-child(2) { animation-delay: 1.6s; }
+.loading-story p:nth-child(3) { animation-delay: 3.2s; }
+.loading-story p:nth-child(4) { animation-delay: 4.4s; }
+
+.loading-story b {
+  color: #bfefff;
+}
+
+.loading-story .codex {
+  color: #ff4a55;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px rgba(255, 60, 70, 0.6);
+}
+
+.loading-goal {
+  font-size: clamp(15px, 1.8vw, 21px) !important;
+  letter-spacing: 0.06em;
+}
+
+@keyframes story-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.loading-footer .progress {
+  margin: 0 0 8px;
+}
+
+.loading-continue {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.loading-screen.ready {
+  cursor: pointer;
+}
+
+/* Narrow or portrait: stack the art above the story. */
+@media (max-aspect-ratio: 1/1) {
+  .loading-layout {
+    flex-direction: column;
+    justify-content: center;
+  }
+  .loading-art img {
+    height: auto;
+    width: min(78vw, 48vh);
+  }
+  .loading-side {
+    width: min(460px, 88vw);
+  }
+}
+
+/* Short landscape phones: smaller type, tighter spacing. */
+@media (max-height: 480px) {
+  .loading-story p {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .loading-goal {
+    font-size: 14px !important;
+  }
+}

@@ -16,6 +16,7 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23020306'/%3E%3Cpath d='M2 2h12v3H5v6h4V8h5v6H2z' fill='%232fd8ff'/%3E%3C/svg%3E"
     />
     <title>Code Maze</title>
+    <link rel="preload" as="image" href="./cover.webp" type="image/webp" />
   </head>
   <body>
     <div id="app">
@@ -104,11 +105,28 @@
         <div class="intro-skip">CLICK · TAP · SPACE TO SKIP</div>
       </div>
 
-      <section id="screen-loading" class="screen">
-        <div class="panel">
-          <h1 class="title">CODE<span>MAZE</span></h1>
-          <div class="progress"><div id="loading-bar"></div></div>
-          <p id="loading-label" class="muted">Initialising…</p>
+      <section id="screen-loading" class="screen loading-screen">
+        <div class="loading-bg" style="background-image: url('./cover.webp')"></div>
+        <div class="loading-layout">
+          <picture class="loading-art">
+            <source srcset="./cover.webp" type="image/webp" />
+            <img src="./cover.jpg" width="1400" height="1400" alt="Maze Craze: a runner in a black coat escapes red-eyed robots down a lab corridor" />
+          </picture>
+          <div class="loading-side">
+            <div class="loading-story">
+              <p><b>2025.</b> Humans and robots lived in harmony.</p>
+              <p>Then a superintelligence called <b class="codex">CODEX</b> rewrote the machines — and turned them against humanity.</p>
+              <p>You wake up trapped inside its research lab.</p>
+              <p class="loading-goal">Escape the maze. Shut down <b class="codex">CODEX</b>.</p>
+            </div>
+            <div class="loading-footer">
+              <div class="progress"><div id="loading-bar"></div></div>
+              <p id="loading-label" class="muted">Initialising…</p>
+              <p id="loading-continue" class="loading-continue hidden">
+                <span class="desktop-only">CLICK OR PRESS ANY KEY TO CONTINUE</span><span class="touch-only">TAP TO CONTINUE</span>
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 

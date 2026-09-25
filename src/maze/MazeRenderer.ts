@@ -55,6 +55,8 @@ export class MazeRenderer {
     private readonly config: MazeConfig,
     textures: MazeTextures,
     private readonly shadows: boolean,
+    /** false: windows are drawn as dark opaque panes, one draw call per chunk (phones). */
+    private readonly glassWindows = true,
   ) {
     this.root.name = 'maze';
     const s = maze.cellSize;
@@ -67,7 +69,7 @@ export class MazeRenderer {
       emissiveIntensity: 1,
       roughness: 0.62,
       metalness: 0.25,
-      alphaTest: 0.5,
+      alphaTest: glassWindows ? 0.5 : 0,
     });
     this.glassMaterial = new MeshStandardMaterial({
       color: 0xa8e4ee,
@@ -142,7 +144,9 @@ export class MazeRenderer {
         for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (this.isVisibleWall(x, y)) count++;
         if (count === 0) continue;
 
-        const mesh = new InstancedMesh(this.wallGeometry, [this.wallMaterial, this.glassMaterial], count);
+        const mesh = this.glassWindows
+          ? new InstancedMesh(this.wallGeometry, [this.wallMaterial, this.glassMaterial], count)
+          : new InstancedMesh(this.wallGeometry, this.wallMaterial, count);
         mesh.name = `walls-${cx}-${cy}`;
         let i = 0;
         for (let y = y0; y < y1; y++) {

@@ -8,7 +8,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { GameAudio } from '../audio/GameAudio';
 import { createSoundLibrary } from '../audio/SoundLibrary';
 import { findDifficulty, resolveLevelConfig } from '../config/GameConfig';
-import type { DifficultyConfig, GameConfig, GraphicsQuality } from '../config/types';
+import type { DifficultyConfig, GameConfig, GraphicsQuality, LootKind } from '../config/types';
 import type { DebugSystem } from '../debug/DebugSystem';
 import { EffectsManager } from '../effects/EffectsManager';
 import { ParticleSystem } from '../effects/ParticleSystem';
@@ -64,6 +64,25 @@ interface GameWorld {
   readonly levels: LevelManager;
   readonly tutorial: TutorialDirector;
 }
+
+/** HUD strings, built once so the per-frame HUD update allocates nothing. */
+function buildPrompts(use: string) {
+  return {
+    open: {
+      weapons: `${use} TO OPEN ${ROOM_LABELS.weapons.text}`,
+      nullifier: `${use} TO OPEN ${ROOM_LABELS.nullifier.text}`,
+      keycard: `${use} TO OPEN ${ROOM_LABELS.keycard.text}`,
+    } as Record<LootKind, string>,
+    escape: `${use} TO ESCAPE`,
+    nextWing: `${use} TO ENTER THE NEXT WING`,
+  };
+}
+const PROMPTS = { desktop: buildPrompts('PRESS E'), touch: buildPrompts('TAP USE') };
+const OPEN_LABELS: Record<LootKind, string> = {
+  weapons: `OPEN ${ROOM_LABELS.weapons.text}`,
+  nullifier: `OPEN ${ROOM_LABELS.nullifier.text}`,
+  keycard: `OPEN ${ROOM_LABELS.keycard.text}`,
+};
 
 /** Seconds between radar pings: blips show where robots were at the last ping. */
 const RADAR_PING = 1.4;
@@ -253,6 +272,7 @@ export class Game implements UICommands {
         ceilingEmissive: assets.requireTexture(TextureKeys.CeilingEmissive),
       },
       shadows: this.quality.shadows,
+      glassWindows: !this.device.lowPower,
       player,
       lampLight,
       robots,
@@ -305,7 +325,12 @@ export class Game implements UICommands {
     if (import.meta.env.DEV || this.params.has('debug')) await this.startDebug(this.world);
 
     progress(1, 'Ready');
-    this.states.transition(GameState.MainMenu);
+    // The launch screen (cover art + story) waits for a tap / key before the menu opens.
+    this.ui.waitForContinue(() => {
+      this.world?.audio.unlock();
+      if (this.device.touch) enterImmersiveMode();
+      this.states.transition(GameState.MainMenu);
+    });
     this.loop.start();
   }
 
@@ -570,6 +595,7 @@ export class Game implements UICommands {
       this.renderPending = false;
       this.sceneManager.render();
     }
+    this.sceneManager.adapt(dt, this.device.lowPower);
     this.debug?.update(dt);
   };
 
@@ -665,15 +691,16 @@ export class Game implements UICommands {
     const level = w.levels.current;
     h.keycard = !level?.keycardRequired ? 'none' : level.hasKeycard ? 'found' : 'missing';
     this.updateTouchAction(w);
-    const use = this.device.touch ? 'TAP USE' : 'PRESS E';
+    // Prompt strings are built once (see PROMPTS), not every frame.
+    const prompts = this.device.touch ? PROMPTS.touch : PROMPTS.desktop;
     h.prompt = w.armory.promptVisible
-      ? `${use} TO OPEN ${ROOM_LABELS[w.armory.promptKind].text}`
+      ? prompts.open[w.armory.promptKind]
       : w.levels.exitPromptVisible
         ? level?.exitLocked
           ? 'EXIT LOCKED — FIND THE KEYCARD IN THE SECURITY ROOM'
           : this.tutorialMode
-            ? `${use} TO ESCAPE`
-            : `${use} TO ENTER THE NEXT WING`
+            ? prompts.escape
+            : prompts.nextWing
         : null;
     // Touch: the context button replaces the "press to…" line whenever it offers the action.
     if (h.action && !this.tutorialMode) h.prompt = null;
@@ -702,7 +729,7 @@ export class Game implements UICommands {
       }
     }
     const level = w.levels.current;
-    if (w.armory.promptVisible) h.action = `OPEN ${ROOM_LABELS[w.armory.promptKind].text}`;
+    if (w.armory.promptVisible) h.action = OPEN_LABELS[w.armory.promptKind];
     else if (w.levels.exitPromptVisible && level && !level.exitLocked) h.action = 'ESCAPE';
   }
 
@@ -723,7 +750,13 @@ export class Game implements UICommands {
     let tz = level.exit.position.z;
     c.targetLabel = 'EXIT';
     if (level.exitLocked) {
-      const room = w.armory.armories.find((a) => a.loot === 'keycard' && !a.looted);
+      let room = null;
+      for (const a of w.armory.armories) {
+        if (a.loot === 'keycard' && !a.looted) {
+          room = a;
+          break;
+        }
+      }
       if (room) {
         tx = room.cacheX;
         tz = room.cacheZ;

@@ -98,6 +98,27 @@ export class UIManager {
     drawMazeMap(byId<HTMLCanvasElement>('menu-map'), maze, { cellPx: 8 });
   }
 
+  /**
+   * Launch screen: loading is done. Shows the continue prompt and calls `onContinue` on the
+   * first click, tap or key press (a user gesture: audio can start, phones can go fullscreen).
+   */
+  waitForContinue(onContinue: () => void): void {
+    const screen = byId('screen-loading');
+    byId('loading-label').classList.add('hidden');
+    byId('loading-continue').classList.remove('hidden');
+    screen.classList.add('ready');
+    const go = (e: Event): void => {
+      e.preventDefault();
+      screen.removeEventListener('click', go);
+      window.removeEventListener('keydown', go);
+      screen.classList.remove('ready');
+      onContinue();
+    };
+    // 'click' (not pointerdown): the menu appears after the tap ends, so the tap cannot land on a menu button.
+    screen.addEventListener('click', go);
+    window.addEventListener('keydown', go);
+  }
+
   setLoading(fraction: number, label: string): void {
     byId('loading-bar').style.width = `${Math.round(fraction * 100)}%`;
     byId('loading-label').textContent = label;
