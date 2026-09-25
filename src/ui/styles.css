@@ -1017,8 +1017,8 @@ body.touch:not(.touch-classic) .touch-buttons {
 body.touch:not(.touch-classic) .touch-emp {
   display: flex;
   position: absolute;
-  right: calc(max(12px, var(--safe-r)) + 130px);
-  bottom: max(18px, var(--safe-b));
+  right: max(22px, var(--safe-r));
+  bottom: max(22px, var(--safe-b));
   width: 78px;
   height: 78px;
   border-radius: 50%;
@@ -1115,16 +1115,46 @@ body.touch:not(.touch-classic) #hud-nullifiers {
   display: none;
 }
 
+/* Compass takes the top-left slot (where the lamp / stamina bars were), a little smaller. */
 body.touch:not(.touch-classic) #hud-compass {
-  top: auto;
-  bottom: max(12px, var(--safe-b));
-  right: max(12px, var(--safe-r));
-  flex-direction: column-reverse;
+  top: calc(max(12px, var(--safe-t)) + 34px);
+  left: max(14px, var(--safe-l));
+  right: auto;
+  bottom: auto;
+  align-items: flex-start;
 }
 
 body.touch:not(.touch-classic) #hud-compass canvas {
-  width: 112px;
-  height: 112px;
+  width: 96px;
+  height: 96px;
+}
+
+/* Lamp and stamina bars go: the lamp has no button on mobile and sprint shows on the stick. */
+body.touch:not(.touch-classic) .hud-bar-row {
+  display: none;
+}
+
+/* Keycard: a small indicator top right, under VIEW / pause. */
+body.touch:not(.touch-classic) #hud-keycard {
+  position: fixed;
+  top: calc(max(12px, var(--safe-t)) + 62px);
+  right: max(12px, var(--safe-r));
+  padding: 5px 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(4, 12, 16, 0.6);
+}
+
+body.touch:not(.touch-classic) #hud-keycard:not(.empty) {
+  color: var(--ok);
+  border-color: rgba(53, 255, 154, 0.6);
+  box-shadow: 0 0 10px rgba(53, 255, 154, 0.35);
+}
+
+body.touch .joystick-hint {
+  white-space: nowrap;
 }
 
 body.touch:not(.touch-classic) .compass-label {
